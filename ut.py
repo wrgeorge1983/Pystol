@@ -81,7 +81,7 @@ class sshutilSwitchTC(unittest.TestCase):
             with open(self.sampleData[i][0], 'r') as fSampleData:
                 self.sampleData[i][1] = fSampleData.read()
 
-        self.sampleData['IP'] = ['161.217.225.140']
+        self.sampleData['IP'] = ['10.217.225.140']
 
     def test_SwitchGetInterfaces(self):
         sw = sshutil.clSwitch(ip=self.sampleData['IP'][0], creds=None)
@@ -100,10 +100,10 @@ class sshutilSwitchTC(unittest.TestCase):
                          ''.format(sw.ports[21], sw.ports[21].description))
         self.assertEqual(sw.ports[22].description,
                          '%End Device: mac:0026.b9f0.095e '
-                         'host:iiakmiblcl28265; Date: 06-01-2015'
+                         'host:blcl28265; Date: 06-01-2015'
                          ''.format(sw.ports[22], sw.ports[22].description))
         self.assertEqual(sw.ports[51].description, '%Connection To: '
-                         'IIAMIBCORE4507-2.ia.doi.net IP:161.217.224.2 Date: '
+                         'CORE4507-2 IP:10.217.224.2 Date: '
                          '06-01-2015', 'Bad Description on {0} : {1}'
                          ''.format(sw.ports[51], sw.ports[51].description))
 
