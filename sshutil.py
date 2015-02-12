@@ -303,22 +303,12 @@ class clSwitch(object):
                             ''.format(self, type(arg)))
     ip = property(get_ip, set_ip)
 
-    def CollectMACAddressTable(self):
-        command = 'sh mac address-table'
-        UpdateMetric('Switch.CollectMACAddressTable')
-        lines = sshrunP(command=command, host=self.ip,
-                        creds=self.credentials)
-        self._MACAddressTable = '\n'.join(
-            [x for x in lines.splitlines() if 'dynamic' in x.lower()])
-
-    def get_MACAddressTable(self):
-        if not self._MACAddressTable:
-            self.CollectMACAddressTable()
-        table = self._MACAddressTable
-        return table
-    MACAddressTable = property(get_MACAddressTable)
-
     def Populate(self):
+        """
+        Run all of this switches 'collect' methods.  Typically faster
+        than running them one by one at different times because you never
+        have to rebuild the connection, etc...
+        """
         metrics.DebugPrint('[{0}].Populate()'.format(self.ip))
 
         # need an IP and creds to start.
@@ -350,8 +340,28 @@ class clSwitch(object):
 
         return self.state
 
+    def CollectMACAddressTable(self):
+        """
+        Connect to switch and pull MAC Address table
+        """
+        command = 'sh mac address-table'
+        UpdateMetric('Switch.CollectMACAddressTable')
+        lines = sshrunP(command=command, host=self.ip,
+                        creds=self.credentials)
+        self._MACAddressTable = '\n'.join(
+            [x for x in lines.splitlines() if 'dynamic' in x.lower()])
+
+    def get_MACAddressTable(self):
+        if not self._MACAddressTable:
+            self.CollectMACAddressTable()
+        table = self._MACAddressTable
+        return table
+    MACAddressTable = property(get_MACAddressTable)
+
     def GetInterfaces(self, data=False):
-        '''Return all interfaces on a switch, including stats'''
+        '''
+        Return all interfaces on a switch, including stats
+        '''
         command = 'show interface'
         UpdateMetric('clSwitch.GetInterfaces')
         if not data:
@@ -452,7 +462,8 @@ class clSwitch(object):
 
     def ClassifyPorts(self, data=False):
         '''
-            Classify ports switchport mode.
+            Classify ports by switchport mode.
+            ('access', 'trunk')
         '''
         name = ''
         switchport = ''
