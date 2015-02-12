@@ -124,7 +124,7 @@ def main(argv):
     metrics.DebugPrint("Options: {0}".format(options), 2)
 
     if not defaultGateway:
-        defaultGateway = '161.217.104.1'
+        defaultGateway = '10.217.104.1'
     DEFAULT_GATEWAY = defaultGateway
     CREDENTIALS = GetCredentials(username)
 
