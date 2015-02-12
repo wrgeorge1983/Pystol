@@ -1,6 +1,8 @@
 # Pystol
 Collection of network management tools written in Python
+
 Deliberately written for a pure cisco environment, but enxtensible to multi-vendor in the future
+
 For now, this is a read-only package.  It will collect information and dump it to screen or text files.  That's it.  But it does this via creating ssh sessions to the devices in question and running typical cisco show commands ("sh cdp nei det"), etc... If you point it at some random device that interprets that command as "SuddenlyHalt CorruptDatabaseParameters" or something, that's on you.  
 
 
