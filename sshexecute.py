@@ -3,11 +3,19 @@ Created on Dec 1, 2014
 
 @author: William.George
 '''
-import paramiko
+# Standard Library Imports
 import time
+
+# External Libarary Imports
+import paramiko
+
+# Imports from other scripts in this project
 from metrics import UpdateMetric
 from metrics import DebugPrint
 
+# These are terrible.
+# Global lists that hold persistent connection information.
+# TODO: UnTerriblize
 SSH_SESSIONS = []
 SSH_CHANNELS = []
 SSH_HOSTS = []
@@ -41,7 +49,9 @@ def NewSSH(host, creds, interactive=False):
 
 def DisablePagingC(chan):
     '''
-        disable paging behavior for interactive cisco sessions
+       OLD IMPLEMENTATION
+       disable paging behavior for interactive cisco sessions
+       "press any key to continue" etc...
     '''
     chan.send("terminal length 0\n")
     time.sleep(.25)
@@ -52,6 +62,7 @@ def DisablePagingC(chan):
 def DisablePagingH(host, creds):
     '''
         disable paging behavior for interactive cisco sessions
+        "press any key to continue" etc...
     '''
     command = "terminal length 0\n"
     sshrunP(command, host, creds)
