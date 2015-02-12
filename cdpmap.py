@@ -4,16 +4,25 @@ Created on Dec 1, 2014
 
 @author: William.George
 '''
+
+# Standard Library Imports
 import sys
+from optparse import OptionParser
+import multiprocessing
+
+# Imports from other scripts in this project
 from sshutil import GetCredentials
 from sshutil import clSwitch
 from sshutil import DedupilicateList
 import metrics
-from optparse import OptionParser
-import multiprocessing
 
 
 def createParser():
+    """
+    Create a parser object for optparse package to collect command line
+    arguments
+    """
+
     usage = ('cdpmap.py -h | ([-t <host>] | -T <hostfile) '
              '[-u <username>] [-o Output file] [-d <maximum thread count>])')
 
@@ -39,21 +48,7 @@ def createParser():
 
 def main(argv):
     """
-    Given switch or list of switches, list CDP neighbors
-
-    cdpmap.py -h | ([-t <host>] | -T <hostfile) [-u <username>]
-        [-o Output file] [-d <maximum thread count>]
-
-    --host or -t     -- hostname or IP address of switch *Will prompt if
-        neither host nor hostfile are provided.
-    --hostfile or -T -- file containing list of switch hostnames or IP
-        addresses, one per line.
-    --username or -u -- username to use to connect. *Will assume currently
-        logged in user if not provided.
-    --threads or -d  -- Number of threads to use for DNS resolution (or other
-        tasks).
-    --outfile or -o  -- primary output to listed file.
-    --help or -h -- print this usage information.
+    Given switch or list of switches, list CDP neighbors, and a few other stats
      """
     global CREDENTIALS
     global CURRENT_SWITCH
@@ -63,6 +58,7 @@ def main(argv):
     username = None
     outfile = ''
 
+    # using optparse module to collect commandline arguments
     parser = createParser()
     (options, args) = parser.parse_args()
     hostfile = options.hostfile
@@ -72,7 +68,7 @@ def main(argv):
     metrics.VERBOSITY = options.verbose
     outfile = options.outfile
 
-    if hostfile:
+    if hostfile:  # make sense of host/hostfile options
         if host:
             metrics.DebugPrint('Cannot specify both "host" and "hostfile"!', 3)
             raise Exception('INVALID OPTIONS')
@@ -82,14 +78,16 @@ def main(argv):
         for line in hosts:
             bHosts.append(line.strip())
         hosts = bHosts
-    elif host:
+    elif host:  # even if it's a single entry, it should be a 'list'
         hosts = [host]
     else:                   # Prompt for host if none present
         hosts = [raw_input('Enter single hostname or IP address (If you want '
                            'multiple hosts, re-run with -T or --hostfile:\n')]
 
+    # Collect UN/PW for connecting to devices.
     CREDENTIALS = GetCredentials(username)
 
+    # Start clock to report how long the actual processing takes
     metrics.Clock(True)
 
     oBuffer = ''
@@ -99,20 +97,21 @@ def main(argv):
         switch = clSwitch(ip=host, creds=CREDENTIALS)
         switches.append(switch)
 
-    if MAX_THREADS > 1:
+    if MAX_THREADS > 1:  # Single or MultiThreaded...
         switches = PopulateSwitchesMT(switches)
     else:
         switches = PopulateSwitchesST(switches)
 
     ScrubbedSwitches = []
     for switch in switches:
-        if switch.state in switch.goodstates:
+        if switch.state in switch.goodstates:  # ignore 'DOWN' switches
             ScrubbedSwitches.append(switch)
         else:
             continue
 
-    for switch in ScrubbedSwitches:
-        oBuffer += switch.ip + '\n'
+    for switch in ScrubbedSwitches:  # prepair output
+        oBuffer += ('{0}:  {1}, {2} ports\n'
+                    ''.format(switch.ip, switch.model, len(switch.ports)))
         for interface in switch.ports:
             for entry in interface.CDPneigh:
                 if 'Switch' in entry[2] or 'Router' in entry[2]:
@@ -125,12 +124,16 @@ def main(argv):
     oBuffer += '\n\n'
     diffhosts = set(finalhosts).difference(set(hosts))
     oBuffer += 'Difference:\n  Added:\n\t' + '\n\t'.join(diffhosts)
-    diffhosts = set(hosts).difference(set(finalhosts))
     oBuffer += '\n'
+    diffhosts = set(hosts).difference(set(finalhosts))
     oBuffer += '  Removed:\n\t' + '\n\t'.join(diffhosts)
+    oBuffer += '\n'
+    cdphosts = [x[1] for x in ListCDPEndpoints(switches)]
+    diffcdphosts = set(cdphosts).difference(set(finalhosts))
+    oBuffer += '  Unaccounted for, but in CDP:\n\t' + '\n\t'.join(diffcdphosts)
     oBuffer += '\n\n'
 
-    if outfile:
+    if outfile:  # Send output to file or screen
         fOut = open(outfile, 'w')
         fOut.write(oBuffer)
         fOut.close()
@@ -142,9 +145,19 @@ def main(argv):
 
 
 def ListCDPEndpoints(switches):
-    CDPNeighbors = [x.CDPneigh for x in switches]
-    
+    s = set()
+    for switch in switches:
+        for port in switch.ports:
+            for entry in port.CDPneigh:
+                s.add((entry[0], entry[1]))
+    return s
 
+def PopulateSwitch(switch):
+    """
+    Wrapper to support multiprocessing.pool.map() syntax
+    """
+    switch.Populate()
+    return switch
 
 def PopulateSwitchesMT(switches):
     metrics.DebugPrint('interfacedescription.py:PopulateSwitchesMT.Threads: '
@@ -165,16 +178,16 @@ def PopulateSwitchesST(switches):
                        '{0}'.format(', '.join(map(str, switches))), 1)
 
     for sw in switches:
+        # use this instead of sw.Populate() for consistency... doesn't
+        # really matter.
         PopulateSwitch(sw)
     return switches
 
 
-def PopulateSwitch(switch):
-    switch.Populate()
-    return switch
-
-
 def Exit():
+    """
+    Used for quick/dirty troubleshooting/performance measurements
+    """
     print 'completed in {0} seconds.'. format(metrics.Clock())
     sys.exit()
 
