@@ -12,6 +12,8 @@ A fellow on reddit (/u/jdub01010101) alerted me to the fact that there was no li
 
 There is no disclaimer on each source file.  I will probably add one, but until then I'll be relying on internet fairies to stop you from hurting yourself with this code.
 
+INSTALLING AND RUNNING
+-----
 This code depends entirely upon Paramiko.  Available at http://www.paramiko.org/.
 Paramiko itself depends on a few other packages.  All of these are available through PyPy and other python package distribution schemes. 
 
