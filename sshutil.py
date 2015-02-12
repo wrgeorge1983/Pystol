@@ -1,18 +1,25 @@
 '''
 Created on Nov 13, 2014
 
+Library of functions and classes to use in other scripts.
+
 @author: William.George
 '''
+# Standard Library Imports
 import getpass
 import time
 import multiprocessing
 import socket
-from metrics import UpdateMetric
-from sshexecute import sshrun, sshrunP
-from metrics import DebugPrint
-import metrics
 import re
 
+# Imports from other scripts in this project
+from metrics import UpdateMetric
+from sshexecute import sshrunP
+from metrics import DebugPrint
+import metrics
+
+
+# TODO:  FIX THIS MESS
 DEBUG = True
 ARP_TABLE = []
 DEFAULT_GATEWAY = None
@@ -24,6 +31,9 @@ def DedupilicateList(oList, tag=None):
     '''
         Given oList, search for duplicates.  If found, print
         information to screen to assist in troubleshooting
+
+        TODO: this can easily be restructured using sets that I didn't know
+        about when I first wrote it.
     '''
     nList = []
     for item in oList:
@@ -73,6 +83,11 @@ def FormatInterfaceName(oInterface, short=False):
     '''
        Ensure consistent formatting of interface names.
        long form unless short == True
+
+       TODO: add 'Tunnel0'
+
+       ALSO TODO: The whole way this works is dumb, and will match any string
+       that starts with the letter 'e'.
     '''
 
     Formats = {
@@ -111,7 +126,7 @@ def FormatInterfaceName(oInterface, short=False):
 
 def GetCredentials(user=None):
     '''
-       Prompt user for password.  Use current username if provided,
+       Prompt user for password.  Use username if provided,
        otherwise, assume current logged in user.
     '''
     password = None
@@ -244,6 +259,7 @@ class clSwitch(object):
         self.credentials = creds
         self.goodstates = ['UNK', 'UP']
         self.state = 'UNK'  # valid states: ['UNK', 'UP', 'DOWN']
+        self.model = 'UNK'
         self._MACAddressTable = ''
 
     def get_ports(self):
@@ -330,6 +346,7 @@ class clSwitch(object):
         metrics.DebugPrint('[{0}]..CollectInterfaceDescriptions()'
                            ''.format(self.ip))
         self.CollectInterfaceDescriptions()
+        self.CollectVersion()
 
         return self.state
 
@@ -409,6 +426,29 @@ class clSwitch(object):
         for switchport in self.ports:
             if switchport.name.lower() in CDPEntries:
                 switchport.CDPneigh.append(CDPEntries[switchport.name.lower()])
+
+    def CollectVersion(self, data=False):
+        '''
+           Pull Version info
+        '''
+        command = 'sh ver'
+        UpdateMetric('clSwitch.CollectVersion')
+        try:
+            rBuffer = sshrunP(command=command, host=self.ip,
+                              creds=self.credentials)
+        except:
+            raise
+
+        spLines = rBuffer.splitlines()
+        lines = [line for line in spLines if 'WS' in line]
+        if len(lines) < 1:
+            self.model = 'UNK'
+        else:
+            line = lines[0]
+            for word in line.split():
+                if 'WS' in word:
+                    self.model = word
+                    break
 
     def ClassifyPorts(self, data=False):
         '''
