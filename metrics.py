@@ -34,6 +34,9 @@ def DebugPrint(msg, level=1):
 
 def Clock(start=False):
     global StartTime
+    # If 'startTime' hasn't already been noted, or explicitly told to restart
+    # timer, then (re)start the timer.  Otherwise, return the currently
+    # elapsed time.
     if start or not StartTime:
         StartTime = time.time()
         return
