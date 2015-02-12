@@ -120,7 +120,7 @@ def main(argv):
                            'multiple hosts, re-run with -T or --hostfile:\n')]
 
     if not defaultGateway:
-        defaultGateway = '161.217.104.1'
+        defaultGateway = '10.217.104.1'
     DEFAULT_GATEWAY = defaultGateway
 
     CREDENTIALS = GetCredentials(username)
