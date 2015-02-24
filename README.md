@@ -26,4 +26,4 @@ And this is GitHub, right?  So if you actually want to contribute, or even just 
 
 AUTHOR
 ------
-My name is William George.
+My name is William R. George, feel free to contact me at [FirstInitial][MiddleInitial][LastName]1983@gmail.com
