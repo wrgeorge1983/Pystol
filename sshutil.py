@@ -255,7 +255,7 @@ class clSwitch(object):
         self.ip = ip
         self.ports = []
         self.devices = []
-        self.CDPinformation = ''
+        self.CDPinformation = {}
         self.credentials = creds
         self.goodstates = ['UNK', 'UP']
         self.state = 'UNK'  # valid states: ['UNK', 'UP', 'DOWN']
@@ -400,7 +400,8 @@ class clSwitch(object):
            ex. switch.ports[1].CDPneigh[0] == (
                NeighborID,
                NeighborIP,
-               NeighborCapabilities)
+               NeighborCapabilities,
+               NieghborPort)
         '''
         command = 'sh cdp ne det'
         UpdateMetric('clSwitch.CollectCDPInformation')
@@ -431,11 +432,14 @@ class clSwitch(object):
                 caps = line.split()[capindex:]
             elif 'interface' in cat:
                 interface = line.split()[1].strip(':,')
-                CDPEntries[interface.lower()] = (cdpid, ip, caps)
+                neighborinterface = line.split()[-1]
+                CDPEntries[interface.lower()] = (cdpid, ip, caps,
+                                                 neighborinterface)
 
         for switchport in self.ports:
             if switchport.name.lower() in CDPEntries:
                 switchport.CDPneigh.append(CDPEntries[switchport.name.lower()])
+        self.CDPinformation = CDPEntries
 
     def CollectVersion(self, data=False):
         '''

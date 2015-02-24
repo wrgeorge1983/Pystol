@@ -124,7 +124,7 @@ def main(argv):
     metrics.DebugPrint("Options: {0}".format(options), 2)
 
     if not defaultGateway:
-        defaultGateway = '10.217.104.1'
+        defaultGateway = '10.10.104.1'
     DEFAULT_GATEWAY = defaultGateway
     CREDENTIALS = GetCredentials(username)
 
@@ -226,7 +226,9 @@ def PrepairDescripiton(switchport):
     if netdevice is not False:  # if this connects to a switch or router,
                                 # go with that
         entry = switchport.CDPneigh[netdevice]
-        description = '%To: {0} IP:{1}'.format(entry[0], entry[1])
+        description = '%{0} ({1})'.format(entry[0],
+                                          sshutil.FormatInterfaceName(entry[3],
+                                                                      True))
         description += (' Date: {0}'.format(Date())).replace('/', '-')
         metrics.DebugPrint('--Description: {0}'.format(description), 0)
         return description

@@ -4,14 +4,17 @@ Created on Nov 4, 2014
 
 @author: William.George
 '''
+# Standard Library Imports
 import sys
 import getopt
+
+# Imports from other scripts in this project
 from sshutil import Listify, GetCredentials, DateTime
 from sshexecute import sshrun
 
-SSH_SESSIONS = []
-SSH_CHANNELS = []
-SSH_HOSTS = []
+
+
+
 DEBUG = False
 
 
