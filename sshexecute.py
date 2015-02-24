@@ -6,7 +6,7 @@ Created on Dec 1, 2014
 # Standard Library Imports
 import time
 
-# External Libarary Imports
+# External Library Imports
 import paramiko
 
 # Imports from other scripts in this project
@@ -102,7 +102,7 @@ def sshrun(command, host=None, creds=None, ssh=None, TextOnly=True):
         return stdIn, stdOut, stdErr
 
 
-def sshrunP(command, host, creds, trim=True, chan=False):
+def sshrunP(command, host, creds, trim=True, chan=False, timeout=1.5):
     """
         Run a command within a persistent session via SSH_SESSIONS, initialize
         as necessary.  THE SESSION IS SUBJECT TO TIMEOUT, and WILL EXPIRE.  If
@@ -146,14 +146,14 @@ def sshrunP(command, host, creds, trim=True, chan=False):
 
     SSH_CHANNELS[index].send(command)
     n = 0
-    # Max time to wait in any given stretch is 1.5 seconds
-    # Sleep .05s at a time, 30 intervals
+    # Max time to wait in any given stretch is timeout seconds
+    # Sleep .05s at a time, timeout/.05 intervals
     interval = .05
     DebugPrint('sshrunP.host: {0}'.format(host, True))
     DebugPrint('sshrunP.command: {0}'.format(command, True))
     while True:
         if not SSH_CHANNELS[index].recv_ready():
-            if n == 30:
+            if n == timeout/interval:
                 UpdateMetric('Delay : {0}'.format(n))
                 break
             if n > 3 and len(rbuffer) > 0 and rbuffer[-1] == '#':

@@ -152,12 +152,14 @@ def ListCDPEndpoints(switches):
                 s.add((entry[0], entry[1]))
     return s
 
+
 def PopulateSwitch(switch):
     """
     Wrapper to support multiprocessing.pool.map() syntax
     """
     switch.Populate()
     return switch
+
 
 def PopulateSwitchesMT(switches):
     metrics.DebugPrint('interfacedescription.py:PopulateSwitchesMT.Threads: '

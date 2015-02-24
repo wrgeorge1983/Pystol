@@ -5,12 +5,16 @@ Created on Nov 12, 2014
 @author: William.George
 '''
 
+# Standard Library Imports
 import sys
-import getopt
-from sshutil import Listify, FormatMACAddress, GetCredentials, ResolveMAC
+from optparse import OptionParser
+# import getopt
+
+# Imports from other scripts in this project
 from sshexecute import sshrun
 import metrics
-from optparse import OptionParser
+from sshutil import Listify, FormatMACAddress, GetCredentials  # , ResolveMAC
+import sshutil
 
 
 def createParser():
@@ -144,7 +148,6 @@ def main(argv):
     else:
         optimal = True
 
-
     if hostfile:
         if host:
             metrics.DebugPrint('Cannot specify both "host" and "hostfile"!', 3)
@@ -166,7 +169,7 @@ def main(argv):
         if ip:
             if not defaultGateway:
                 defaultGateway = hosts[0]
-            mac = ResolveMAC(ip=ip, defaultgateway=defaultGateway, creds=creds)
+            mac = ResolveMAC(ip=ip, device=defaultGateway, creds=creds)
             if 'Not Found' in mac:
                 sys.exit('Could not find MAC Address!')
         else:
@@ -178,7 +181,7 @@ def main(argv):
 
         MACAddressTable = ''
         # nextswitch will be set if we have picked up the mac somewhere and
-        # have a specific switch we want to look at next otherwise, (or if
+        # have a specific switch we want to look at next.  Otherwise, (or if
         # 'optimal' is false) just hit the next switch in the list.
         if nextswitch is not None and optimal:
             sw = nextswitch
@@ -215,6 +218,36 @@ def main(argv):
             print abort
 
     return found, abort, rslt, switchport
+
+
+def ResolveMAC(device, ip, creds):
+    '''
+        Given an IP address and the appropriate subnet default gateway,
+        SSH into the default gateway, ping the IP, and use arp table to resolve
+        the MAC.
+    '''
+    # TODO:  We don't check to make sure this device is actually up at all
+    lines = []
+    command = 'sh arp'
+    if not (ip):
+        raise Exception('No IP Address specified to resolve!')
+    # DebugPrint('ResolveMAC.defaultgateway: ' + str(defaultgateway))
+    # DebugPrint('ResolveMAC.creds[0]: ' + creds[0])
+
+    # ==========================================================================
+    # Assume that device is NOT already a clSwitch Object.  When that is no
+    # longer the case, change the parameters.
+    # ==========================================================================
+
+    device = sshutil.clSwitch(ip=device, creds=creds)
+    lines = device.Execute('ping {0}'.format(ip), timeout=5)
+    line = device.Execute('sh arp | i {0}'.format(ip))
+
+    if len(line) == 0 or line.split()[3].lower() == 'incomplete':
+        return 'Not Found'
+    else:
+        rslt = line.split()[3]
+        return rslt
 
 
 if __name__ == '__main__':

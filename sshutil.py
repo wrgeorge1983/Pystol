@@ -303,6 +303,15 @@ class clSwitch(object):
                             ''.format(self, type(arg)))
     ip = property(get_ip, set_ip)
 
+    def Execute(self, command, timeout=1.5):
+        """
+        Connect to switch and execute 'command'
+        """
+        UpdateMetric('Switch.Execute')
+        lines = sshrunP(command=command, host=self.ip,
+                        creds=self.credentials, timeout=timeout)
+        return lines
+
     def Populate(self):
         """
         Run all of this switches 'collect' methods.  Typically faster
