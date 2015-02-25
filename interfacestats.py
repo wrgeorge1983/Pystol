@@ -5,10 +5,12 @@ Created on Dec 3, 2014
 @author: William.George
 '''
 
+# Standard Library Imports
 import sys
 import getopt
 import csv
-# import time
+
+# Imports from other scripts in this project
 from sshutil import GetCredentials, clSwitch
 from sshutil import DedupilicateList
 from metrics import PrintMetrics

@@ -8,7 +8,7 @@ Created on Nov 12, 2014
 # Standard Library Imports
 import sys
 from optparse import OptionParser
-# import getopt
+
 
 # Imports from other scripts in this project
 from sshexecute import sshrun

@@ -19,16 +19,16 @@ MAX_THREADS = None
 DEFAULT_GATEWAY = None
 MULTITHREADING = False
 
+# Standard Library Imports
 import sys
-import time
-import getopt
-# import time
 import sshutil
+from optparse import OptionParser
+import multiprocessing
+
+# Imports from other scripts in this project
 from sshutil import GetCredentials, clSwitch  # clEndDevice, clSwitchPort
 from sshutil import Date, DateTime  # DeduplicateList
 import metrics
-from optparse import OptionParser
-import multiprocessing
 
 
 def createParser():

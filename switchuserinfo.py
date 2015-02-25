@@ -19,15 +19,16 @@ main(hosts):
 
 
 '''
+
+# Standard Library Imports
+import sys
+from optparse import OptionParser
+
+# Imports from other scripts in this project
 from sshutil import GetCredentials
 from sshutil import clSwitch
 import sshutil
-
-import getopt
-import sys
-import time
 import metrics
-from optparse import OptionParser
 
 DEFAULT_GATEWAY = None
 CREDENTIALS = None  # SET THESE IN MAIN()!
