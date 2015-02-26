@@ -3,7 +3,7 @@ ABOUT
 -----
 Collection of network management tools written in Python
 
-Deliberately written for a pure cisco environment, but enxtensible to multi-vendor in the future
+Deliberately written for a pure cisco environment, but extensible to multi-vendor in the future
 
 For now, this is a read-only package.  It will collect information and dump it to screen or text files.  That's it.  But it does this via creating ssh sessions to the devices in question and running typical cisco show commands ("sh cdp nei det"), etc... If you point it at some random device that interprets that command as "SuddenlyHalt CorruptDatabaseParameters" or something, that's on you.  
 
@@ -11,7 +11,7 @@ LICENSE
 ------
 A fellow on reddit (/u/jdub01010101) alerted me to the fact that there was no license file, so I added one.  In the event you wish to do something with this that isn't permitted under this license (LGPL2.1), or have any argument at all as to why I should use some other license, let me know.  I will probably agree, but I'm done thinking about it for right now.
 
-There is no disclaimer on each source file.  I will probably add one, but until then I'll be relying on internet fairies to stop you from hurting yourself with this code.
+There is no disclaimer on each source file.  I will probably add one, but until then I'll be relying on Internet fairies and Reddit Karma to stop you from hurting yourself with this code.
 
 INSTALLING AND RUNNING
 -----
