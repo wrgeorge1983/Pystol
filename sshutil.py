@@ -84,9 +84,7 @@ def FormatInterfaceName(oInterface, short=False):
        Ensure consistent formatting of interface names.
        long form unless short == True
 
-       TODO: add 'Tunnel0'
-
-       ALSO TODO: The whole way this works is dumb, and will match any string
+       TODO: The whole way this works is dumb, and will match any string
        that starts with the letter 'e'.
     '''
 
@@ -97,7 +95,8 @@ def FormatInterfaceName(oInterface, short=False):
         'vl': ['Vl', 'Vlan'],
         'se': ['Se', 'Serial'],
         'te': ['Te', 'TenGigabitEthernet'],
-        'po': ['Po', 'Port-Channel']
+        'po': ['Po', 'Port-Channel'],
+        'tu': ['Tu', 'Tunnel']
         }
     if oInterface in ['', None]:
         return oInterface
