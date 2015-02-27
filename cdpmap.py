@@ -8,7 +8,7 @@ Created on Dec 1, 2014
 # Standard Library Imports
 import sys
 from optparse import OptionParser
-import multiprocessing
+import multiprocessing.pool
 
 # Imports from other scripts in this project
 from sshutil import GetCredentials
@@ -167,7 +167,7 @@ def PopulateSwitchesMT(switches):
     metrics.DebugPrint('interfacedescription.py:PopulateSwitchesMT.Switches: '
                        '{0}'.format(', '.join(map(str, switches))), 1)
 
-    pool = multiprocessing.Pool(processes=MAX_THREADS)
+    pool = multiprocessing.pool.ThreadPool(processes=MAX_THREADS)
     mtRslts = pool.map(PopulateSwitch, switches)
     pool.close()
     pool.join()

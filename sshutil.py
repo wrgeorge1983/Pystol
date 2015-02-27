@@ -385,7 +385,7 @@ class clSwitch(object):
         UpdateMetric('clSwitch.GetInterfaces')
         if not data:
             try:
-                lines = self.Execute(command)
+                lines = self.Execute(command).splitlines()
             except:
                 self.state = 'DOWN'
                 return []
@@ -630,6 +630,7 @@ class clSwitchPort(object):
         self._detail = ''
         self.status = ''
         self.description = ''
+        self._name = None
         if detail:
             self.detail = detail
         else:
