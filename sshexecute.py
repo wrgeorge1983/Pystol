@@ -22,6 +22,127 @@ SSH_HOSTS = []
 DEBUG = False
 
 
+class clSSHConnection(object):
+    """
+    Wrapper for ssh connections
+    """
+    def __init__(self, ip, credentials, interactive=False):
+        self.ip = ip
+        self.credentials = credentials
+        self.interactive = interactive
+        self.TextOnly = True
+        self.session = None
+        self.channel = None
+        self.connectionTimeout = 5
+        self.rcvTimeout = 1.5
+        self.trim = True
+        self.stdIn = None
+        self.stdOut = None
+        self.stdErr = None
+
+    def run(self, command, timeout=None):
+        self._connect()
+        if self.interactive:
+            return self._runP(command, timeout)
+        else:
+            return self._run(command)
+
+    def _runP(self, command, timeout=None):
+        UpdateMetric('_runP()')
+        chan = self.channel
+        if not timeout:
+            timeout = self.rcvTimeout
+        rbuffer = ''
+        trim = self.trim
+        if not command[-1] == '\n':
+            command += '\n'
+        chan.send(command)
+        n = 0
+        # Max t    ime to wait in any given stretch is timeout seconds
+        # Sleep .05s at a time, timeout/.05 intervals
+        interval = .05
+        DebugPrint('_runP.host: {0}'.format(self.ip, True))
+        DebugPrint('_runP.command: {0}'.format(command, True))
+        while True:
+            if not chan.recv_ready():
+                if n == timeout/interval:
+                    UpdateMetric('Delay : {0}'.format(n))
+                    break
+                if n > 3 and len(rbuffer) > 0 and rbuffer[-1] == '#':
+                    break
+                n += 1
+                time.sleep(interval)
+                if DEBUG:
+                    print ("waiting for data... ", n)
+            else:
+                rbuffer += chan.recv(1000)
+                if n > 0:
+                    UpdateMetric('Delay : {0}ms'.format((n * 1000)*interval))
+                n = 0
+
+        if trim:
+            rslt = '\n'.join(rbuffer.splitlines()[1:-1])
+        else:
+            rslt = rbuffer
+        if DEBUG:
+            print(rbuffer)
+        return rslt
+
+    def _run(self, command):
+        UpdateMetric('_run()')
+        DebugPrint("_run.host: {0}".format(self.ip), 0)
+        DebugPrint("_run.command: {0}".format(command), 0)
+        self.stdIn, self.stdOut, self.stdErr = self.session.exec_command(
+            command)
+        if self.TextOnly:
+            rslt = self.stdOut.read()
+            return rslt
+        pass
+
+    def _connect(self):
+        """
+        Test for properly initialized session and channel, initialize as
+        necessary.
+        """
+        if not self.session or (self.interactive and
+                                (not self.channel or
+                                 not self.channel.transport.is_active())):
+            self._NewSSH()
+
+    def _NewSSH(self):
+        """
+        Create a new SSH Connection, ip/creds must be specified already
+        """
+        UpdateMetric('clSSHConnection.NewSSH()')
+        ip = self.ip
+        username, password = self.credentials
+        interactive = self.interactive
+        DebugPrint('NewSSH.ip: ' + str(ip), 0)
+        DebugPrint('NewSSH.username: ' + str(username), 0)
+        DebugPrint('NewSSH.interactive: ' + str(interactive), 0)
+
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        try:
+            ssh.connect(self.ip, username=username, password=password,
+                        timeout=5)
+        except:
+            raise Exception('Couldn\'t Connect to {host}!'.format(host=ip))
+
+        self.session = ssh
+        if interactive:
+            self.channel = ssh.invoke_shell()
+            self.DisablePagingH()
+
+    def DisablePagingH(self):
+        '''
+            disable paging behavior for interactive cisco sessions
+            "press any key to continue" etc...
+        '''
+        command = "terminal length 0\n"
+        self.run(command)
+
+
 def NewSSH(host, creds, interactive=False):
     """Initialize ssh connection object to specified host"""
     UpdateMetric('NewSSH')
@@ -45,18 +166,6 @@ def NewSSH(host, creds, interactive=False):
         chan = ssh.invoke_shell()
         # DisablePagingC(chan)
         return ssh, chan
-
-
-def DisablePagingC(chan):
-    '''
-       OLD IMPLEMENTATION
-       disable paging behavior for interactive cisco sessions
-       "press any key to continue" etc...
-    '''
-    chan.send("terminal length 0\n")
-    time.sleep(.25)
-    # print('buffer:', chan.recv(1500))
-    chan.recv(1500)
 
 
 def DisablePagingH(host, creds):

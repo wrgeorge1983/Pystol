@@ -15,6 +15,7 @@ import re
 # Imports from other scripts in this project
 from metrics import UpdateMetric
 from sshexecute import sshrunP
+import sshexecute
 from metrics import DebugPrint
 import metrics
 
@@ -260,6 +261,7 @@ class clSwitch(object):
         self.state = 'UNK'  # valid states: ['UNK', 'UP', 'DOWN']
         self.model = 'UNK'
         self._MACAddressTable = ''
+        self.connection = None
 
     def get_ports(self):
         return self._ports
@@ -302,13 +304,23 @@ class clSwitch(object):
                             ''.format(self, type(arg)))
     ip = property(get_ip, set_ip)
 
+    def _Connect(self):
+        if self.connection is None:
+            self.connection = sshexecute.clSSHConnection(self.ip,
+                                                         self.credentials,
+                                                         True)
+
     def Execute(self, command, timeout=1.5):
         """
         Connect to switch and execute 'command'
         """
+        self._Connect()
         UpdateMetric('Switch.Execute')
-        lines = sshrunP(command=command, host=self.ip,
-                        creds=self.credentials, timeout=timeout)
+        lines = self.connection.run(command, timeout)
+        # ======================================================================
+        # lines = sshrunP(command=command, host=self.ip,
+        #                 creds=self.credentials, timeout=timeout)
+        # ======================================================================
         return lines
 
     def Populate(self):
@@ -354,8 +366,7 @@ class clSwitch(object):
         """
         command = 'sh mac address-table'
         UpdateMetric('Switch.CollectMACAddressTable')
-        lines = sshrunP(command=command, host=self.ip,
-                        creds=self.credentials)
+        lines = self.Execute(command)
         self._MACAddressTable = '\n'.join(
             [x for x in lines.splitlines() if 'dynamic' in x.lower()])
 
@@ -374,8 +385,7 @@ class clSwitch(object):
         UpdateMetric('clSwitch.GetInterfaces')
         if not data:
             try:
-                lines = sshrunP(command, self.ip,
-                                self.credentials).splitlines()
+                lines = self.Execute(command)
             except:
                 self.state = 'DOWN'
                 return []
@@ -414,8 +424,7 @@ class clSwitch(object):
         command = 'sh cdp ne det'
         UpdateMetric('clSwitch.CollectCDPInformation')
         try:
-            rBuffer = sshrunP(command=command, host=self.ip,
-                              creds=self.credentials)
+            rBuffer = self.Execute(command)
         except:
             raise
 
@@ -456,8 +465,7 @@ class clSwitch(object):
         command = 'sh ver'
         UpdateMetric('clSwitch.CollectVersion')
         try:
-            rBuffer = sshrunP(command=command, host=self.ip,
-                              creds=self.credentials)
+            rBuffer = self.Execute(command)
         except:
             raise
 
@@ -488,8 +496,7 @@ class clSwitch(object):
             if self.state not in self.goodstates:
                 return
             try:
-                rBuffer = sshrunP(command=command, host=self.ip,
-                                  creds=self.credentials)
+                rBuffer = self.Execute(command)
             except:
                 raise
 
@@ -528,7 +535,7 @@ class clSwitch(object):
             return
 
         try:
-            rBuffer = sshrunP(command=command, host=self.ip, creds=CREDENTIALS)
+            rBuffer = self.Execute(command)
         except:
             raise
         spLines = rBuffer.splitlines()[1:]
