@@ -24,6 +24,23 @@ REQUESTS, CONTRIBUTIONS, FEEDBACK
 --------------------
 And this is GitHub, right?  So if you actually want to contribute, or even just see something I could be doing better, feel free to let me know.  I made this because I wanted it for myself, but if it can be useful for others as well, then so much the better.
 
+EXAMPLE
+-------
+
+I needed to monitor a switch for physical changes being implemented by a pair of hands a long way away, and the following scriptlet illustrated the rapid-utility I'm going for:
+
+```python
+import time
+import sshutil
+ip = '10.10.10.10'
+creds = sshutil.GetCredentials()
+switch = clSwitch(ip=ip, creds=creds)
+cmd = 'sh env pow all'
+while True:
+    print switch.Execute(cmd)
+    time.sleep(60)
+```
+
 AUTHOR
 ------
 My name is William R. George, feel free to contact me at \[FirstInitial\]\[MiddleInitial\]\[LastName\]1983@gmail.com
