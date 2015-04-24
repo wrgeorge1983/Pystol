@@ -250,12 +250,14 @@ class clSwitch(object):
         represent a switch, contains clSwitchPorts and references
         to their clEndDevices
     '''
-    def __init__(self, creds, ip='None'):  # str ip
+    def __init__(self, ip='None', creds=None):  # str ip
         self._ip = 'None'
         self.ip = ip
         self.ports = []
         self.devices = []
         self.CDPinformation = {}
+        if not creds:
+            raise SyntaxError('No Credentials Specified')
         self.credentials = creds
         self.goodstates = ['UNK', 'UP']
         self.state = 'UNK'  # valid states: ['UNK', 'UP', 'DOWN']
@@ -310,13 +312,15 @@ class clSwitch(object):
                                                          self.credentials,
                                                          True)
 
-    def Execute(self, command, timeout=1.5):
+    def Execute(self, command, trim=True, timeout=1.5):
         """
         Connect to switch and execute 'command'
         """
         self._Connect()
         UpdateMetric('Switch.Execute')
-        lines = self.connection.run(command, timeout)
+        lines = self.connection.run(command=command,
+                                    trim=trim,
+                                    timeout=timeout)
         # ======================================================================
         # lines = sshrunP(command=command, host=self.ip,
         #                 creds=self.credentials, timeout=timeout)
@@ -790,8 +794,8 @@ def ProcessEndDevices(switches, creds=None, defaultgateway=None, maxThreads=1):
         defaultgateway = DEFAULT_GATEWAY
     else:
         DEFAULT_GATEWAY = defaultgateway
-    if defaultgateway is None:
-        raise Exception('No Default Gateway!')
+    # if defaultgateway is None:
+    #     raise Exception('No Default Gateway!')
 
     endDevices = []
     switches = Listify(switches)
@@ -811,6 +815,10 @@ def ProcessEndDevices(switches, creds=None, defaultgateway=None, maxThreads=1):
     if (endDevices is None) or len(endDevices) == 0:
         DebugPrint('ProcessEndDevices.NoEndDevicesFound!', 3)
         return []
+
+    if defaultgateway is None:
+        DebugPrint('No default gateway.  Skipping IP and DNS resolution!', 3)
+        return endDevices
 
     DebugPrint('Resolving MAC addresses', 2)
     for endDevice in endDevices:

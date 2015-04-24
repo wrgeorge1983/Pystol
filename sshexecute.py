@@ -40,25 +40,26 @@ class clSSHConnection(object):
         self.stdOut = None
         self.stdErr = None
 
-    def run(self, command, timeout=None):
+    def run(self, command, timeout=None, trim=None):
         self._connect()
         if self.interactive:
-            return self._runP(command, timeout)
+            return self._runP(command, timeout, trim)
         else:
             return self._run(command)
 
-    def _runP(self, command, timeout=None):
+    def _runP(self, command, timeout=None, trim=None):
         UpdateMetric('_runP()')
         chan = self.channel
         if not timeout:
             timeout = self.rcvTimeout
         rbuffer = ''
-        trim = self.trim
+        if trim is None:
+            trim = self.trim
         if not command[-1] == '\n':
             command += '\n'
         chan.send(command)
         n = 0
-        # Max t    ime to wait in any given stretch is timeout seconds
+        # Max time to wait in any given stretch is timeout seconds
         # Sleep .05s at a time, timeout/.05 intervals
         interval = .05
         DebugPrint('_runP.host: {0}'.format(self.ip, True))
