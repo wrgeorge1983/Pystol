@@ -21,11 +21,11 @@ MULTITHREADING = False
 
 # Standard Library Imports
 import sys
-import sshutil
 from optparse import OptionParser
 import multiprocessing.pool
 
 # Imports from other scripts in this project
+import sshutil
 from sshutil import GetCredentials, clSwitch  # clEndDevice, clSwitchPort
 from sshutil import Date, DateTime  # DeduplicateList
 import metrics
@@ -124,7 +124,7 @@ def main(argv):
     metrics.DebugPrint("Options: {0}".format(options), 2)
 
     if not defaultGateway:
-        defaultGateway = '10.10.104.1'
+        defaultGateway = None  # '10.10.104.1'
     DEFAULT_GATEWAY = defaultGateway
     CREDENTIALS = GetCredentials(username)
 
