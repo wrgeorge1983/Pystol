@@ -161,18 +161,20 @@ class clEndDevice(object):
         self._switchport = switchport
         self.dns = dns
 
-    def get_mac(self):
+    @property
+    def mac(self):
         return self._mac
 
-    def set_mac(self, value):
+    @mac.setter
+    def mac(self, value):
         self._mac = FormatMACAddress(value)
 
-    mac = property(get_mac, set_mac)
-
-    def get_switchport(self):
+    @property
+    def switchport(self):
         return self._switchport
 
-    def set_switchport(self, port):  # could be clSwitchPort or str
+    @switchport.setter
+    def switchport(self, port):  # could be clSwitchPort or str
         if not isinstance(self.switch, clSwitch):
             self._switchport = FormatInterfaceName(str(port))
             # if switch is str, this must also be str
@@ -195,12 +197,13 @@ class clEndDevice(object):
         if self not in devices:
             devices += [self]
         self._switchport = self.switch.ports[index]
-    switchport = property(get_switchport, set_switchport)
 
-    def get_switch(self):
+    @property
+    def switch(self):
         return self._switch
 
-    def set_switch(self, switch):
+    @switch.setter
+    def switch(self, switch):
         # needs to be an actual clSwitch or None or String
         if type(switch) == str:
             self._switch = switch
@@ -215,8 +218,6 @@ class clEndDevice(object):
             self.switch.devices += [self]
         else:
             self.switch.devices[self.switch.devices.index(self)] = self
-
-    switch = property(get_switch, set_switch)
 
     def __repr__(self):
         return ('EndDevice(mac={0}, ip={1}, dns={2}, switch={3}, '
@@ -250,7 +251,7 @@ class clSwitch(object):
         represent a switch, contains clSwitchPorts and references
         to their clEndDevices
     '''
-    def __init__(self, ip='None', creds=None):  # str ip
+    def __winit__(self, ip='None', creds=None):  # str ip
         self._ip = 'None'
         self.ip = ip
         self.ports = []
@@ -265,10 +266,12 @@ class clSwitch(object):
         self._MACAddressTable = ''
         self.connection = None
 
-    def get_ports(self):
+    @property
+    def ports(self):
         return self._ports
 
-    def set_ports(self, arg):
+    @ports.setter
+    def ports(self, arg):
         if type(arg) == list:
             self._ports = arg
             i = 0
@@ -282,29 +285,30 @@ class clSwitch(object):
         else:
             raise Exception('can\'t set \'clSwitch({0}).ports\''
                             'with {1}'.format(self, type(arg)))
-    ports = property(get_ports, set_ports)
 
-    def get_devices(self):
+    @property
+    def devices(self):
         return self._devices
 
-    def set_devices(self, arg):
+    @devices.setter
+    def devices(self, arg):
         if type(arg) == list:
             self._devices = arg
         else:
             raise Exception('can\'t set \'clSwitch({0}).devices\' with {1}'
                             ''.format(self, type(arg)))
-    devices = property(get_devices, set_devices)
 
-    def get_ip(self):
+    @property
+    def ip(self):
         return self._ip
 
-    def set_ip(self, arg):
+    @ip.setter
+    def ip(self, arg):
         if type(arg) == str:
             self._ip = arg
         else:
             raise Exception('can\'t set \'clSwitch({0}).ip\' to {1}'
                             ''.format(self, type(arg)))
-    ip = property(get_ip, set_ip)
 
     def _Connect(self):
         if self.connection is None:
@@ -374,12 +378,12 @@ class clSwitch(object):
         self._MACAddressTable = '\n'.join(
             [x for x in lines.splitlines() if 'dynamic' in x.lower()])
 
-    def get_MACAddressTable(self):
+    @property
+    def MACAddressTable(self):
         if not self._MACAddressTable:
             self.CollectMACAddressTable()
         table = self._MACAddressTable
         return table
-    MACAddressTable = property(get_MACAddressTable)
 
     def GetInterfaces(self, data=False):
         '''
@@ -641,21 +645,24 @@ class clSwitchPort(object):
             self.name = name
         self._edge = True
 
-    def get_CDPneigh(self):
+    @property
+    def CDPneigh(self):
         return self._CDPneigh
 
-    def set_CDPneigh(self, arg):
+    @CDPneigh.setter
+    def CDPneigh(self, arg):
         if type(arg) == list or arg is None:
             self._CDPneigh = arg
         else:
             raise Exception('can\'t set \'clSwitchPort({0}).CDPneigh\' with '
                             '{1}'.format(self, type(arg)))
-    CDPneigh = property(get_CDPneigh, set_CDPneigh)
 
-    def get_devices(self):
+    @property
+    def devices(self):
         return self._devices
 
-    def set_devices(self, arg):
+    @devices.setter
+    def devices(self, arg):
         if type(arg) == list:
             self._devices = arg
             i = 0
@@ -669,25 +676,27 @@ class clSwitchPort(object):
         else:
             raise Exception('can\'t set \'clSwitchPort({0}).devices\' with '
                             '{1}'.format(self, type(arg)))
-    devices = property(get_devices, set_devices)
 
-    def get_name(self):
+    @property
+    def name(self):
         return self._name
 
-    def set_name(self, value):
+    @name.setter
+    def name(self, value):
         if value is None:
             self._name = value
         else:
             self._name = FormatInterfaceName(value)
-    name = property(get_name, set_name)
 
-    def get_switchportMode(self):
+    @property
+    def switchportMode(self):
         if self._switchportMode:
             return self._switchportMode
         else:
             return 'access'
 
-    def set_switchportMode(self, value):
+    @switchportMode.setter
+    def switchportMode(self, value):
         if type(value) == str:
             value = value.lower()
 
@@ -695,12 +704,13 @@ class clSwitchPort(object):
             self._switchportMode = value
         else:
             self._switchportMode = 'unknown'
-    switchportMode = property(get_switchportMode, set_switchportMode)
 
-    def get_detail(self):
+    @property
+    def detail(self):
         return self._detail
 
-    def set_detail(self, value):
+    @detail.setter
+    def detail(self, value):
         UpdateMetric('SwitchportSetDetail')
         if type(value) is not str and not (len(value) > 0):
             raise Exception('can\'t set \'clSwitchPort({0}).detail with '
@@ -739,7 +749,6 @@ class clSwitchPort(object):
         except Exception as e:
             print self._detail
             raise e
-    detail = property(get_detail, set_detail)
 
     def _get_edge(self, CDPneigh=[], switchportMode='access'):
         '''
@@ -759,9 +768,9 @@ class clSwitchPort(object):
         else:
             return True
 
-    def get_edge(self):
+    @property
+    def edge(self):
         return self._get_edge(self.CDPneigh, self.switchportMode)
-    edge = property(get_edge)
 
     def __repr__(self):
         return ('SwitchPort(Name={0}, Switch={1}, switchportMode={2},'
