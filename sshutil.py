@@ -249,7 +249,7 @@ class clSwitch(object):
         represent a switch, contains clSwitchPorts and references
         to their clEndDevices
     '''
-    def __winit__(self, ip='None', creds=None):  # str ip
+    def __init__(self, ip='None', creds=None):  # str ip
         self._ip = 'None'
         self.ip = ip
         self.ports = []
