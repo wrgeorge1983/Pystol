@@ -1,4 +1,4 @@
-'''
+'''Library of classes and functions for managing 
 Created on Nov 13, 2014
 
 Library of functions and classes to use in other scripts.
@@ -29,12 +29,9 @@ CURRENT_SWITCH = None
 
 
 def DedupilicateList(oList, tag=None):
-    '''
-        Given oList, search for duplicates.  If found, print
-        information to screen to assist in troubleshooting
+    '''Given oList, search for duplicates.
+    If found, print information to screen to assist in troubleshooting
 
-        TODO: this can easily be restructured using sets that I didn't know
-        about when I first wrote it.
     '''
     nList = []
     for item in oList:
@@ -61,11 +58,12 @@ def Listify(obj):
 
 
 def FormatMACAddress(oMac):
-    """
-        Ensure a MAC address (or fragment) is formatted consistent with the
-        Cisco show commands.  If it's 4 characters, return it unmodified.
-        If it's 12 or more characters, remove any '.' or '-', and format it
-        'the Cisco Way'; return.
+    """Ensure a MAC address (or fragment) is formatted consistent with the
+    
+    Cisco show commands.  If it's 4 characters, return it unmodified.
+    If it's 12 or more characters, remove any '.' or '-', and format it
+    'the Cisco Way'; return.
+    
     """
     if oMac is None:
         return None
