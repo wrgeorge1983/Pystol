@@ -23,9 +23,18 @@ DEBUG = False
 
 
 class clSSHConnection(object):
-    """
-    Wrapper for ssh connections
-    """
+    '''Wrapper for paramiko ssh connections.
+
+        If created with `interactive=True` will create and maintain a persistant
+    session in self.session.  Session is still subject to timeout by remote
+    host, but clSSHConnection will transparently recreate as necessary.  Do not
+    depend on this to preserve state long term.  Primarily intended to save on 
+    setup/teardown costs.
+
+        Interactive mode works and is appropriate for 'multi-line commands' that
+    require answering prompts from the remote host, e.g. cisco: `copy file scp:`
+    '''
+
     def __init__(self, ip, credentials, interactive=False):
         self.ip = ip
         self.credentials = credentials
@@ -41,6 +50,8 @@ class clSSHConnection(object):
         self.stdErr = None
 
     def run(self, command, timeout=None, trim=None):
+        '''Run a command, interactive or not'''
+        
         self._connect()
         if self.interactive:
             return self._runP(command, timeout, trim)
@@ -48,6 +59,7 @@ class clSSHConnection(object):
             return self._run(command)
 
     def _runP(self, command, timeout=None, trim=None):
+        '''Run a command in interactive mode'''
         UpdateMetric('_runP()')
         chan = self.channel
         if not timeout:
@@ -90,6 +102,8 @@ class clSSHConnection(object):
         return rslt
 
     def _run(self, command):
+        '''Run a command without interactive mode'''
+
         UpdateMetric('_run()')
         DebugPrint("_run.host: {0}".format(self.ip), 0)
         DebugPrint("_run.command: {0}".format(command), 0)
@@ -101,19 +115,16 @@ class clSSHConnection(object):
         pass
 
     def _connect(self):
-        """
-        Test for properly initialized session and channel, initialize as
-        necessary.
-        """
+        '''Create and properly initialize session and channel as necessary'''
+        
         if not self.session or (self.interactive and
                                 (not self.channel or
                                  not self.channel.transport.is_active())):
             self._NewSSH()
 
     def _NewSSH(self):
-        """
-        Create a new SSH Connection, ip/creds must be specified already
-        """
+        '''Create a new SSH Connection'''
+
         UpdateMetric('clSSHConnection.NewSSH()')
         ip = self.ip
         username, password = self.credentials
@@ -136,16 +147,17 @@ class clSSHConnection(object):
             self.DisablePagingH()
 
     def DisablePagingH(self):
-        '''
-            disable paging behavior for interactive cisco sessions
+        '''disable paging behavior for interactive cisco sessions
             "press any key to continue" etc...
         '''
+
         command = "terminal length 0\n"
         self.run(command)
 
 
 def NewSSH(host, creds, interactive=False):
-    """Initialize ssh connection object to specified host"""
+    '''Initialize ssh connection object to specified host'''
+    
     UpdateMetric('NewSSH')
     DebugPrint('NewSSH.host: ' + str(host), 0)
     DebugPrint('NewSSH.creds: ' + str(creds[0]), 0)
@@ -170,16 +182,17 @@ def NewSSH(host, creds, interactive=False):
 
 
 def DisablePagingH(host, creds):
+    '''disable paging behavior for interactive cisco sessions 
+
+    "press any key to continue" etc...
     '''
-        disable paging behavior for interactive cisco sessions
-        "press any key to continue" etc...
-    '''
+    
     command = "terminal length 0\n"
     sshrunP(command, host, creds)
 
 
 def sshrun(command, host=None, creds=None, ssh=None, TextOnly=True):
-    """Run a single command on a single host via SSH_SESSIONS.
+    '''Run a single command on a single host via SSH_SESSIONS.
 
     command  -- string defining command to be ran (e.x. 'show run | inc vty')
     host     -- hostname or IP address.  Only valid if ssh is None
@@ -189,7 +202,8 @@ def sshrun(command, host=None, creds=None, ssh=None, TextOnly=True):
                   efficiency
     TextOnly -- Returns text only result of command, versus stdIn,stdOut,StdErr
         tuple.  Default is True
-    """
+    '''
+    
     UpdateMetric('sshrun')
     DebugPrint("sshrun.host: {0}".format(host), 0)
     DebugPrint("sshrun.command: {0}".format(command), 0)
@@ -212,18 +226,23 @@ def sshrun(command, host=None, creds=None, ssh=None, TextOnly=True):
         return stdIn, stdOut, stdErr
 
 
-def sshrunP(command, host, creds, trim=True, chan=False, timeout=1.5):
-    """
-        Run a command within a persistent session via SSH_SESSIONS, initialize
-        as necessary.  THE SESSION IS SUBJECT TO TIMEOUT, and WILL EXPIRE.  If
-        session expires, it will be recreated the next time a command is ran.
+def sshrunP(command, host, creds, trim=True, timeout=1.5):
+    '''Run a command using persistent session via SSH_SESSIONS.
+    
+    THE SESSION IS SUBJECT TO TIMEOUT, and WILL EXPIRE.  If session expires, it 
+    will be recreated the next time a command is ran.
+        IMPORTANT:  Will append '\n' to command if not already present
 
-        command  -- string defining command to be ran (e.x.
-            'show run | inc vty')
-        host     -- hostname or IP address.  Only valid if ssh is None
-        creds    -- credentials to use to connect.  Only valid if ssh is None
+    Keyword arguments:
+    command  -- string defining command to be passed (e.x. 'show run | inc vty')
+    host     -- hostname or IP address.  Only valid if ssh is None
+    creds    -- credentials to use to connect.  Only valid if ssh is None
+    trim     -- remove first and last lines of output, which typically echo the 
+        command and give the prompt for next command.  (default True)
 
-    """
+    timeout  -- How long to wait without receiving data before returning output.
+    '''
+
     global SSH_SESSIONS
     global SSH_CHANNELS
     rbuffer = ''
