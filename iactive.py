@@ -25,6 +25,19 @@ import sshutil
 # File class from user fdb on StackOverflow
 # http://stackoverflow.com/questions/5896079/python-head-tail-and-backward-read-by-lines-of-a-text-file
 
+# We're going to define some "constants", really just variables.  We define them here, then attempt to import a file that will overwrite them.
+#    If the file exists, great, it works and will overwrite them, otherwise they'll keep the values defined here.  The upshot is we get to 
+#    publish this on github without worrying exposing sensitive data.  ** Make sure to git ignore iactiveconstants.py **
+
+DEFAULT_SW_IP = '10.10.10.10'
+DEFAULT_HOST_IP = '10.10.10.10'
+
+try:
+    import iactiveconstants
+    DEFAULT_SW_IP = iactiveconstants.DEFAULT_SW_IP
+    DEFAULT_HOST_IP = iactiveconstants.DEFAULT_HOST_IP
+except ImportError:
+    pass
 
 class File(file):
     """ An helper class for file reading  """
@@ -169,7 +182,7 @@ except:
 
 def retrieve_pcaps(sw):
     destcreds = sshutil.GetCredentials()
-    host = '10.10.10.10'
+    host = DEFAULT_HOST_IP
     lines = sw.Execute('sh flash: | i pcap').splitlines()
     files = [line.split()[-1] for line in lines]
     for fil in files:
@@ -185,7 +198,7 @@ def retrieve_pcaps(sw):
 
 creds = sshutil.GetCredentials()
 clintSwitch.credentials = creds
-clintSwitch.site = '10.10.10.10'
+clintSwitch.site = DEFAULT_SW_IP
 if __name__ == "__main__":
     # interact()
     # run_interactive_interpreter()
