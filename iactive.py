@@ -158,14 +158,15 @@ class clintSwitch(sshutil.clSwitch):
         args = [cmd, trim]
         if not timeout:
             timeout = self.timeout
-            
+         
         if timeout:
             args.append(timeout)
-
+        
         print self.Execute(*args)
 
-#    def interact():q
-#        Popen(
+    def interact(self):
+        cmd = 'ssh {0}'.format(self.ip)
+        Popen(cmd, shell=True).communicate()
 
 
 def pythonrc():
