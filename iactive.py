@@ -169,9 +169,16 @@ class clintSwitch(sshutil.clSwitch):
         Popen(cmd, shell=True).communicate()
 
 
+def poll(sw, cmd, sleep_time):
+    while True:
+        sw.pexecute(cmd)
+        time.sleep(sleep_time)
+
+
 def pythonrc():
     home = os.path.expanduser('~/')
     return home + '.pythonrc.py'
+
 
 # run users pythonrc
 try:
