@@ -85,7 +85,6 @@ class File(file):
         yield last_row
 
 
-# TODO: This should really be wrapped in a class
 def ipm(site, ipt):
     '''
         ipm(site, ipt):
@@ -110,9 +109,11 @@ def ipm(site, ipt):
     return '.'.join(site[:4-len(ipt)] + ipt)
 
 
+# TODO: This should really be wrapped in a class
 def pull_subnets():
     ipam = phpipam.PHPIPAM('ipam', 'Pystol',
                            '00fc27a19df2efd9e06d8b0480498910')
+    ipam.scheme = 'https'
     rslt = ipam.read_subnets()
     jload = json.loads(rslt)
     subnets = jload['data']
@@ -123,6 +124,33 @@ def site_lookup(sfilter):
     subnets = pull_subnets()
     return [subnets[x] for x in range(0, len(subnets) - 1) if sfilter in
             subnets[x]['description']]
+
+
+class IPAMController:
+    '''Generic wrapper for JSON objects returned by ipam api'''
+
+
+class IPAMSubnet:
+    '''Wrap subnet JSON objects that come from phpipam'''
+
+    def __init__(self, data=None, **kwargs):
+        '''Takes either the JSON data by itself or unpacked keywords.
+        if unpacked values are passed, ensure only the 'data' portion
+        of the result is sent.  i.e.:
+            rslt = ipam.read_subnets(id=1)
+            rslt = json.loads(rslt)['data']
+            subnet
+        '''
+        if data is not None:
+            kwargs = json.loads(data)['data']
+        
+        # Unsure if this is consistent or not, but I've seen it at least once
+        if type(kwargs) is list:  
+            kwargs = kwargs[0]
+
+        for k, v in kwargs.items():
+            setattr(self, k, v)
+
 
 
 # Wrapps clSwitch() with features that are great for interactive access, but would be terrible
