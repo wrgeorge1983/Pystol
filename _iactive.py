@@ -21,6 +21,7 @@ import sshutil
 
 # Imports from third party modules
 import phpipam
+import ipaddress
 
 # File class from user fdb on StackOverflow
 # http://stackoverflow.com/questions/5896079/python-head-tail-and-backward-read-by-lines-of-a-text-file
@@ -28,11 +29,18 @@ import phpipam
 
 DEFAULT_SW_IP = '10.10.10.10'
 DEFAULT_HOST_IP = '10.10.10.10'
+DEFAULT_IPAM_HOST = 'ipam'
+DEFAULT_IPAM_API_ID = 'ipam'
+DEFAULT_IPAM_API_KEY = 'FFFFF'
+
 
 try:
     import iactiveconstants
     DEFAULT_SW_IP = iactiveconstants.DEFAULT_SW_IP
     DEFAULT_HOST_IP = iactiveconstants.DEFAULT_HOST_IP
+    DEFAULT_IPAM_HOST = iactiveconstants.DEFAULT_IPAM_HOST
+    DEFAULT_IPAM_API_ID = iactiveconstants.DEFAULT_IPAM_API_ID
+    DEFAULT_IPAM_API_KEY = iactiveconstants.DEFAULT_IPAM_API_KEY
 except ImportError:
     pass
 
@@ -111,8 +119,8 @@ def ipm(site, ipt):
 
 # TODO: This should really be wrapped in a class
 def pull_subnets():
-    ipam = phpipam.PHPIPAM('ipam', 'Pystol',
-                           '00fc27a19df2efd9e06d8b0480498910')
+    ipam = phpipam.PHPIPAM(DEFAULT_IPAM_HOST, DEFAULT_IPAM_API_ID,
+                           DEFAULT_IPAM_API_KEY)
     ipam.scheme = 'https'
     rslt = ipam.read_subnets()
     jload = json.loads(rslt)
@@ -126,14 +134,10 @@ def site_lookup(sfilter):
             subnets[x]['description']]
 
 
-class IPAMController:
+class IPAMController(object):
     '''Generic wrapper for JSON objects returned by ipam api'''
 
-
-class IPAMSubnet:
-    '''Wrap subnet JSON objects that come from phpipam'''
-
-    def __init__(self, data=None, **kwargs):
+    def __init__(self, ipam, data=None, **kwargs):
         '''Takes either the JSON data by itself or unpacked keywords.
         if unpacked values are passed, ensure only the 'data' portion
         of the result is sent.  i.e.:
@@ -141,6 +145,7 @@ class IPAMSubnet:
             rslt = json.loads(rslt)['data']
             subnet
         '''
+        self.ipam = ipam
         if data is not None:
             kwargs = json.loads(data)['data']
         
@@ -150,11 +155,93 @@ class IPAMSubnet:
 
         for k, v in kwargs.items():
             setattr(self, k, v)
+        
+
+class IPAMSubnet(IPAMController):
+    '''Wrap subnet JSON objects that come from phpipam'''
+    def __init__(self, **kwargs):
+        super(IPAMSubnet, self).__init__(**kwargs)
+
+        net, mask = self.subnet, self.mask
+        try:
+            self.network = ipaddress.ip_network(u'{0}/{1}'.format(net, mask))
+        except ValueError:
+            self.network = 'INVALID'
+        self._site_codes = []
+
+    def _pull_site_codes(self):
+        id = self.id
+        addresses = self.ipam.generic('addresses', 'read', subnetId=id, format='ip')
+        addresses = json.loads(addresses)['data']
+        names = (x['dns_name'] for x in addresses)
+        site_codes = (x[5:8] for x in names)
+        self._site_codes = set(site_codes)
+
+    @property
+    def site_codes(self):
+        if len(_site_codes) == 0:
+            self._pull_site_codes()
+
+        return self._site_codes()
+    
+    def __str__(self):
+        return str(self.network)
 
 
+class IPAM(phpipam.PHPIPAM):
+    '''Handle subnets and addresses meaningfully'''
+    def __init__(self,
+                 url=DEFAULT_IPAM_HOST,
+                 api_id=DEFAULT_IPAM_API_ID,
+                 api_key=DEFAULT_IPAM_API_KEY,
+                 scheme='https'):
+        super(IPAM, self).__init__(url, api_id, api_key)
+        self.scheme = scheme
+        self._subnets = None
+        self._raw_subnets = None
+        self._addresse = None
 
-# Wrapps clSwitch() with features that are great for interactive access, but would be terrible
-# to use in an normal script.
+    def _pull_raw_subnets(self):
+        rslt = self.read_subnets()
+        jload = json.loads(rslt)
+        self._raw_subnets = jload['data']
+    
+    @property
+    def raw_subnets(self):
+        if self._raw_subnets is None:
+            self._pull_raw_subnets()
+        return self._raw_subnets
+
+    def _pull_subnets(self):
+        self._subnets = {}
+        for subnet in self.raw_subnets:
+            self._subnets[subnet[u'id']] = IPAMSubnet(ipam=self, **subnet)
+        
+
+    @property
+    def subnets(self, id=None):
+        '''access one or all subnets'''
+        if self._subnets is None:
+            self._pull_subnets()
+
+        if id is not None:
+            return self._subnets[id]
+
+        return self._subnets
+
+    def audit_subnets(self):
+        rslt = True
+        for subnet in self.subnets.values():
+            try:
+                net, mask = subnet.subnet, subnet.mask
+                subnet.network = ipaddress.ip_network(u'{0}/{1}'.format(net, mask))
+            except ValueError as e:
+                rslt = False
+                print e
+        return rslt
+
+# Wrapps clSwitch() with features that are great for interactive access, 
+# but would be terrible to use in an normal script.
 class clintSwitch(sshutil.clSwitch):
     def __init__(self, ip=None, creds=None, timeout=None):
         if timeout:
