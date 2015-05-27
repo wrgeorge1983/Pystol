@@ -190,7 +190,7 @@ class IPAMSubnet(IPAMController):
 
 class IPAM(phpipam.PHPIPAM):
     '''Handle subnets and addresses meaningfully'''
-    def __init__(self,
+    def __init__(self,                                                   
                  url=DEFAULT_IPAM_HOST,
                  api_id=DEFAULT_IPAM_API_ID,
                  api_key=DEFAULT_IPAM_API_KEY,
@@ -283,6 +283,12 @@ class clintSwitch(sshutil.clSwitch):
     def interact(self):
         cmd = 'ssh {0}'.format(self.ip)
         Popen(cmd, shell=True).communicate()
+
+    def bufferflush(self):
+        rslt = ''
+        while self.connection.channel.recv_ready():
+            rslt += self.connection.channel.recv(1000)
+        return rslt
 
 
 def poll(sw, cmd, sleep_time):
