@@ -11,9 +11,9 @@ from optparse import OptionParser
 import multiprocessing.pool
 
 # Imports from other scripts in this project
-from sshutil import GetCredentials
+from sshutil import get_credentials
 from sshutil import clSwitch
-from sshutil import DedupilicateList
+from sshutil import deduplicate_list
 import metrics
 
 
@@ -85,14 +85,14 @@ def main(argv):
                            'multiple hosts, re-run with -T or --hostfile:\n')]
 
     # Collect UN/PW for connecting to devices.
-    CREDENTIALS = GetCredentials(username)
+    CREDENTIALS = get_credentials(username)
 
     # Start clock to report how long the actual processing takes
     metrics.Clock(True)
 
     oBuffer = ''
     switches = []
-    hosts = DedupilicateList(hosts)
+    hosts = deduplicate_list(hosts)
     for host in hosts:
         switch = clSwitch(ip=host, creds=CREDENTIALS)
         switches.append(switch)

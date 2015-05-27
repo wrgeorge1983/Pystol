@@ -11,8 +11,8 @@ import getopt
 import csv
 
 # Imports from other scripts in this project
-from sshutil import GetCredentials, clSwitch
-from sshutil import DedupilicateList
+from sshutil import get_credentials, clSwitch
+from sshutil import deduplicate_list
 from metrics import PrintMetrics
 from metrics import DebugPrint
 
@@ -92,10 +92,10 @@ def main(argv):
         hosts = raw_input('Enter single hostname or IP address (If you want '
                           'multiple hosts, re-run with -T or --hostfile:\n')
 
-    CREDENTIALS = GetCredentials(username)
+    CREDENTIALS = get_credentials(username)
 
     oBuffer = ''
-    hosts = DedupilicateList(hosts)
+    hosts = deduplicate_list(hosts)
     switches = []
     for host in hosts:
         switch = clSwitch(ip=host, creds=CREDENTIALS)

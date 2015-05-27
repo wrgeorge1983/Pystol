@@ -37,12 +37,10 @@ except:
     print 'Couldn\'t include ~/.pythonrc.py'
     raise
 
-creds = sshutil.GetCredentials()
+creds = sshutil.get_credentials()
 clintSwitch.credentials = creds
 clintSwitch.site = DEFAULT_SW_IP
 if __name__ == "__console__":
-    # interact()
-    # run_interactive_interpreter()
     pass
 else:
     print __name__

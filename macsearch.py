@@ -13,7 +13,7 @@ from optparse import OptionParser
 # Imports from other scripts in this project
 from sshexecute import sshrun
 import metrics
-from sshutil import Listify, FormatMACAddress, GetCredentials  # , ResolveMAC
+from sshutil import listify, format_mac_address, get_credentials  # , ResolveMAC
 import sshutil
 
 
@@ -158,10 +158,10 @@ def main(argv):
         hosts = [host]
     else:
         hosts = raw_input('What host to check?')
-    hosts = Listify(hosts)
+    hosts = listify(hosts)
 
     while creds[1] is None or creds[1] == '':
-        creds = GetCredentials(username)
+        creds = get_credentials(username)
         if creds[1] == '' or creds[1] is None:
             print ("blank password isn't what you want!")
 
@@ -174,7 +174,7 @@ def main(argv):
                 sys.exit('Could not find MAC Address!')
         else:
             mac = raw_input('What MAC Address?')
-    mac = FormatMACAddress(mac)
+    mac = format_mac_address(mac)
 
     i = 0
     while not abort and (not (found and optimal)):

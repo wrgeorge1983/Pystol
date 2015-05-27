@@ -26,7 +26,7 @@ import multiprocessing.pool
 
 # Imports from other scripts in this project
 import sshutil
-from sshutil import GetCredentials, clSwitch  # clEndDevice, clSwitchPort
+from sshutil import get_credentials, clSwitch  # clEndDevice, clSwitchPort
 from sshutil import Date, DateTime  # DeduplicateList
 import metrics
 
@@ -126,7 +126,7 @@ def main(argv):
     if not defaultGateway:
         defaultGateway = None  # '10.10.104.1'
     DEFAULT_GATEWAY = defaultGateway
-    CREDENTIALS = GetCredentials(username)
+    CREDENTIALS = get_credentials(username)
 
     metrics.Clock(True)
     switches = PrepairSwitches(hosts, CREDENTIALS, DEFAULT_GATEWAY)
@@ -227,7 +227,7 @@ def PrepairDescripiton(switchport):
                                 # go with that
         entry = switchport.CDPneigh[netdevice]
         description = '%{0} ({1})'.format(entry[0],
-                                          sshutil.FormatInterfaceName(entry[3],
+                                          sshutil.format_interface_name(entry[3],
                                                                       True))
         description += (' Date: {0}'.format(Date())).replace('/', '-')
         metrics.DebugPrint('--Description: {0}'.format(description), 0)

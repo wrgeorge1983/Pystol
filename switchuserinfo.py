@@ -25,7 +25,7 @@ import sys
 from optparse import OptionParser
 
 # Imports from other scripts in this project
-from sshutil import GetCredentials
+from sshutil import get_credentials
 from sshutil import clSwitch
 import sshutil
 import metrics
@@ -124,7 +124,7 @@ def main(argv):
         defaultGateway = '10.217.104.1'
     DEFAULT_GATEWAY = defaultGateway
 
-    CREDENTIALS = GetCredentials(username)
+    CREDENTIALS = get_credentials(username)
 
     metrics.Clock(True)
     metrics.DebugPrint('hosts:' + str(hosts), 1)

@@ -1,10 +1,10 @@
-'''Library of classes and functions for managing 
+"""Library of classes and functions for managing
 Created on Nov 13, 2014
 
 Library of functions and classes to use in other scripts.
 
 @author: William.George
-'''
+"""
 # Standard Library Imports
 import getpass
 import time
@@ -28,11 +28,11 @@ CREDENTIALS = None  # SET THESE IN MAIN()!
 CURRENT_SWITCH = None
 
 
-def DedupilicateList(oList, tag=None):
-    '''Given oList, search for duplicates.
+def deduplicate_list(oList, tag=None):
+    """Given oList, search for duplicates.
     If found, print information to screen to assist in troubleshooting
 
-    '''
+    """
     nList = []
     for item in oList:
         if item in nList:
@@ -46,7 +46,7 @@ def DedupilicateList(oList, tag=None):
     return nList
 
 
-def Listify(obj):
+def listify(obj):
     """Return obj if it's already a list, package it in a list and return it if
     it's not.
     """
@@ -57,7 +57,7 @@ def Listify(obj):
     return rslt
 
 
-def FormatMACAddress(oMac):
+def format_mac_address(oMac):
     """Ensure a MAC address (or fragment) is formatted consistent with the
     
     Cisco show commands.  If it's 4 characters, return it unmodified.
@@ -78,14 +78,12 @@ def FormatMACAddress(oMac):
     return rslt.lower()
 
 
-def FormatInterfaceName(oInterface, short=False):
-    '''
+def format_interface_name(oInterface, short=False):
+    """
        Ensure consistent formatting of interface names.
        long form unless short == True
-
-       TODO: The whole way this works is dumb, and will match any string
-       that starts with the letter 'e'.
-    '''
+    """
+    # TODO: The whole way this works is dumb, and will match any string that starts with the letter 'e'.
 
     Formats = {
         'gi': ['Gi', 'GigabitEthernet'],
@@ -122,11 +120,11 @@ def FormatInterfaceName(oInterface, short=False):
     return nInterface
 
 
-def GetCredentials(user=None):
-    '''
+def get_credentials(user=None):
+    """
        Prompt user for password.  Use username if provided,
        otherwise, assume current logged in user.
-    '''
+    """
     password = None
     if user is None or user == '':
         user = getpass.getuser()
@@ -136,14 +134,14 @@ def GetCredentials(user=None):
 
 
 def DateTime():
-    '''Return current time as dd/mm/yyyy - hh:mm:ss'''
+    """Return current time as dd/mm/yyyy - hh:mm:ss"""
     DTFormat = "%d/%m/%Y - %H:%M:%S"
     rslt = time.strftime(DTFormat)
     return rslt
 
 
 def Date():
-    '''Return current Date as dd/mm/yyyy'''
+    """Return current Date as dd/mm/yyyy"""
     DTFormat = "%d/%m/%Y"
     rslt = time.strftime(DTFormat)
     return rslt
@@ -165,7 +163,7 @@ class clEndDevice(object):
 
     @mac.setter
     def mac(self, value):
-        self._mac = FormatMACAddress(value)
+        self._mac = format_mac_address(value)
 
     @property
     def switchport(self):
@@ -174,13 +172,13 @@ class clEndDevice(object):
     @switchport.setter
     def switchport(self, port):  # could be clSwitchPort or str
         if not isinstance(self.switch, clSwitch):
-            self._switchport = FormatInterfaceName(str(port))
+            self._switchport = format_interface_name(str(port))
             # if switch is str, this must also be str
             return
             # raise Exception('can\'t set \'clEndDevice({0}).switchport({1})\'
             # before .switch has a real object '.format(self,port))
         if type(port) == str:
-            port = FormatInterfaceName(port)
+            port = format_interface_name(port)
             # if it's a string, make sure it's formatted properly
         # even if it's a string, we don't create an object yet, because it
         # could already be created and in place
@@ -244,25 +242,64 @@ class clEndDevice(object):
         return NotImplemented
 
 
-class clSwitch(object):
-    '''
-        represent a switch, contains clSwitchPorts and references
-        to their clEndDevices
-    '''
+class clNetworkDevice(object):
     def __init__(self, ip='None', creds=None):  # str ip
         self._ip = 'None'
         self.ip = ip
-        self.ports = []
-        self.devices = []
-        self.CDPinformation = {}
         if not creds:
             raise SyntaxError('No Credentials Specified')
         self.credentials = creds
         self.goodstates = ['UNK', 'UP']
         self.state = 'UNK'  # valid states: ['UNK', 'UP', 'DOWN']
         self.model = 'UNK'
-        self._MACAddressTable = ''
         self.connection = None
+
+    @property
+    def ip(self):
+        return self._ip
+
+    @ip.setter
+    def ip(self, arg):
+        # TODO: implement ipaddress class, at that time evaluate permitting integer values
+        if type(arg) in [str, type(None)]:
+            self._ip = str(arg)
+        else:
+            raise Exception('can\'t set \'clSwitch({0}).ip\' to {1}'
+                            ''.format(self, type(arg)))
+
+    def _Connect(self):
+        if self.connection is None:
+            self.connection = sshexecute.clSSHConnection(self.ip,
+                                                         self.credentials,
+                                                         True)
+
+    def Execute(self, command, trim=True, timeout=1.5):
+        """
+        Connect to switch and execute 'command'
+        """
+        self._Connect()
+        UpdateMetric('Switch.Execute')
+        lines = self.connection.run(command=command,
+                                    trim=trim,
+                                    timeout=timeout)
+        return lines
+
+
+class clRiverbed(clNetworkDevice):
+    pass
+
+
+class clSwitch(clNetworkDevice):
+    """
+        represent a switch, contains clSwitchPorts and references
+        to their clEndDevices
+    """
+    def __init__(self, ip='None', creds=None):  # str ip
+        clNetworkDevice.__init__(self, ip, creds)
+        self.ports = []
+        self.devices = []
+        self.CDPinformation = {}
+        self._MACAddressTable = ''
 
     @property
     def ports(self):
@@ -295,39 +332,6 @@ class clSwitch(object):
         else:
             raise Exception('can\'t set \'clSwitch({0}).devices\' with {1}'
                             ''.format(self, type(arg)))
-
-    @property
-    def ip(self):
-        return self._ip
-
-    @ip.setter
-    def ip(self, arg):
-        if type(arg) == str:
-            self._ip = arg
-        else:
-            raise Exception('can\'t set \'clSwitch({0}).ip\' to {1}'
-                            ''.format(self, type(arg)))
-
-    def _Connect(self):
-        if self.connection is None:
-            self.connection = sshexecute.clSSHConnection(self.ip,
-                                                         self.credentials,
-                                                         True)
-
-    def Execute(self, command, trim=True, timeout=1.5):
-        """
-        Connect to switch and execute 'command'
-        """
-        self._Connect()
-        UpdateMetric('Switch.Execute')
-        lines = self.connection.run(command=command,
-                                    trim=trim,
-                                    timeout=timeout)
-        # ======================================================================
-        # lines = sshrunP(command=command, host=self.ip,
-        #                 creds=self.credentials, timeout=timeout)
-        # ======================================================================
-        return lines
 
     def Populate(self):
         """
@@ -384,9 +388,9 @@ class clSwitch(object):
         return table
 
     def GetInterfaces(self, data=False):
-        '''
+        """
         Return all interfaces on a switch, including stats
-        '''
+        """
         command = 'show interface'
         UpdateMetric('clSwitch.GetInterfaces')
         if not data:
@@ -402,7 +406,7 @@ class clSwitch(object):
         first = True
         for line in lines:
             try:
-                FormatInterfaceName(line.split()[0], True)
+                format_interface_name(line.split()[0], True)
             except Exception:
                 pass
             else:
@@ -419,14 +423,14 @@ class clSwitch(object):
         self.ports.append(port)
 
     def CollectCDPInformation(self, data=False):
-        '''
+        """
            Apply CDP neighbor information to self.ports[]
            ex. switch.ports[1].CDPneigh[0] == (
                NeighborID,
                NeighborIP,
                NeighborCapabilities,
                NieghborPort)
-        '''
+        """
         command = 'sh cdp ne det'
         UpdateMetric('clSwitch.CollectCDPInformation')
         try:
@@ -465,9 +469,9 @@ class clSwitch(object):
         self.CDPinformation = CDPEntries
 
     def CollectVersion(self, data=False):
-        '''
+        """
            Pull Version info
-        '''
+        """
         command = 'sh ver'
         UpdateMetric('clSwitch.CollectVersion')
         try:
@@ -487,10 +491,10 @@ class clSwitch(object):
                     break
 
     def ClassifyPorts(self, data=False):
-        '''
+        """
             Classify ports by switchport mode.
             ('access', 'trunk')
-        '''
+        """
         name = ''
         switchport = ''
         mode = ''
@@ -510,7 +514,7 @@ class clSwitch(object):
         DebugPrint('clSwitch.ports: {0}'.format(self.ports))
         for line in spLines:
             if 'Name:' in line:
-                name = FormatInterfaceName(line.split()[-1])
+                name = format_interface_name(line.split()[-1])
                 switchport = ''
                 mode = ''
             elif 'Switchport:' in line:
@@ -530,11 +534,11 @@ class clSwitch(object):
                 port.switchport = switchport
 
     def CollectInterfaceDescriptions(self, data=False):
-        '''
+        """
             Apply existing interface descriptions to
             switch.ports[] ex. switch.ports[1].description = 'Trunk to
             ABQCore1'
-        '''
+        """
         command = 'sh int description'
         UpdateMetric('CollectInterfaceDescriptions')
         if not (self.state in self.goodstates):
@@ -546,7 +550,7 @@ class clSwitch(object):
             raise
         spLines = rBuffer.splitlines()[1:]
         for switchport in self.ports:
-            name = FormatInterfaceName(str(switchport), short=True)
+            name = format_interface_name(str(switchport), short=True)
             try:
                 line = next(x for x in spLines if name in x)
             except StopIteration:
@@ -588,19 +592,19 @@ class clSwitch(object):
 
         for interface in scrubbedInterfaceList:
             for line in macAddressTable.splitlines():
-                if line.strip().endswith(FormatInterfaceName(str(interface),
+                if line.strip().endswith(format_interface_name(str(interface),
                                                              short=True)):
                     scrubbedMACAddressTable.append(line.strip())
 
         for line in scrubbedMACAddressTable:
-            mac = FormatMACAddress(line.split()[1])
+            mac = format_mac_address(line.split()[1])
             port = line.split()[-1]
             ed = clEndDevice()
             ed.mac = mac
             ed.switch = self
             ed.switchport = port
             rslt.append(ed)
-        rslt = DedupilicateList(rslt, 'returning from GetEndDevices')
+        rslt = deduplicate_list(rslt, 'returning from GetEndDevices')
         return rslt
 
     def __repr__(self):
@@ -618,11 +622,11 @@ class clSwitch(object):
 
 
 class clSwitchPort(object):
-    '''
+    """
         Represent ports attached to a clSwitch.  Contains
         clEndDevice objects and reference to its parent
         clSwitch.
-    '''
+    """
 
     def __init__(self, name=None, switch=None, switchportMode=None,
                  detail=None):
@@ -684,7 +688,7 @@ class clSwitchPort(object):
         if value is None:
             self._name = value
         else:
-            self._name = FormatInterfaceName(value)
+            self._name = format_interface_name(value)
 
     @property
     def switchportMode(self):
@@ -749,12 +753,12 @@ class clSwitchPort(object):
             raise e
 
     def _get_edge(self, CDPneigh=[], switchportMode='access'):
-        '''
+        """
             'edge' in this context means
             'not connected to a switch or router, determined via CDP'
             AND
             'switchport mode == access'
-        '''
+        """
         for neighbor in CDPneigh:
             nlist = ' '.join(neighbor[2]).lower()
             if (('switch' in nlist) or
@@ -787,10 +791,10 @@ class clSwitchPort(object):
 
 
 def ProcessEndDevices(switches, creds=None, defaultgateway=None, maxThreads=1):
-    '''
+    """
         call GetEndDevices for given host(s), resolve IPs and DNS information
         return list
-    '''
+    """
     metrics.DebugPrint('sshutil.py:ProcessEndDevices()', 2)
     metrics.DebugPrint('::hosts:{0}\n::defaultgateway:{1}\n::maxThreads:{2}'
                        ''.format(switches, defaultgateway, maxThreads), 1)
@@ -805,7 +809,7 @@ def ProcessEndDevices(switches, creds=None, defaultgateway=None, maxThreads=1):
     #     raise Exception('No Default Gateway!')
 
     endDevices = []
-    switches = Listify(switches)
+    switches = listify(switches)
 
     if creds is None:
         creds = CREDENTIALS
@@ -837,9 +841,9 @@ def ProcessEndDevices(switches, creds=None, defaultgateway=None, maxThreads=1):
 
 
 def ResolveIP(ip):
-    '''
+    """
         Given an IP address, return appropriate DNS entry, if any
-    '''
+    """
     try:
         DebugPrint('Resolving IP: ' + str(ip), 0)
         dns = (socket.gethostbyaddr(ip))[0]
@@ -850,10 +854,10 @@ def ResolveIP(ip):
 
 def ResolveIPsMT(endDevices, maxThreads=4):
 
-    '''
+    """
         Given list of clEndDevices, use pool of subprocesses
         (count determined by MAX_THREADS) to call ResolveIP()
-    '''
+    """
     ips = []
     dns = []
     DebugPrint('ResolveIPsMT.maxThreads: ' + str(maxThreads))
@@ -875,10 +879,10 @@ def ResolveIPsMT(endDevices, maxThreads=4):
 
 
 def GetMACAddressTable(host=None, interface=None):
-    '''
+    """
         Returns either the entire MAC address table, or entries
         for an individual interface, depending upon input
-    '''
+    """
     if host is None:
         if CURRENT_SWITCH is None:
             raise Exception('CURRENT_SWITCH not set!')
@@ -899,10 +903,10 @@ def GetMACAddressTable(host=None, interface=None):
 
 
 def ClassifyPorts(host=None):
-    '''
+    """
         Given host, return list of ports that are:
         UP, UP, and switchport mode access
-    '''
+    """
     if host is None:
         if CURRENT_SWITCH is None:
             raise Exception('CURRENT_SWITCH not set!')
@@ -928,16 +932,16 @@ def ClassifyPorts(host=None):
         elif 'Operational Mode:' in line:
             mode = line.split()[-1]
             if switchport == 'Enabled' and mode == 'access':
-                ports.append(FormatInterfaceName(name))
+                ports.append(format_interface_name(name))
     return ports
 
 
 def ResolveMAC(mac=None, defaultgateway=None, ip=None, creds=None):
-    '''
+    """
         Given a MAC or IP address and the appropriate subnet default gateway,
         SSH into the default gateway and use arp table to resolve between MAC
         and IP
-    '''
+    """
     lines = []
     command = 'sh arp'
     global ARP_TABLE

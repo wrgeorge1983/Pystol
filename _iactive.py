@@ -1,12 +1,12 @@
 #! /usr/bin/python
-'''
+"""
 Created on Mar 26, 2015
 
 @author: William.George
 
 Credit to /r/Python for the non-wasteful and sensible handling of oldInit and
     newInit
-'''
+"""
 # Standard Library Imports
 import os
 import sys
@@ -14,7 +14,8 @@ import json
 from pprint import pprint  # Not used here, but we want it in interactive mode.
 import time
 from subprocess import Popen
-sys.path += [os.getcwd()]  # 
+
+sys.path += [os.getcwd()]
 
 # Imports from other modules in this project
 import sshutil
@@ -23,9 +24,6 @@ import sshutil
 import phpipam
 import ipaddress
 
-# File class from user fdb on StackOverflow
-# http://stackoverflow.com/questions/5896079/python-head-tail-and-backward-read-by-lines-of-a-text-file
-
 
 DEFAULT_SW_IP = '10.10.10.10'
 DEFAULT_HOST_IP = '10.10.10.10'
@@ -33,9 +31,9 @@ DEFAULT_IPAM_HOST = 'ipam'
 DEFAULT_IPAM_API_ID = 'ipam'
 DEFAULT_IPAM_API_KEY = 'FFFFF'
 
-
 try:
     import iactiveconstants
+
     DEFAULT_SW_IP = iactiveconstants.DEFAULT_SW_IP
     DEFAULT_HOST_IP = iactiveconstants.DEFAULT_HOST_IP
     DEFAULT_IPAM_HOST = iactiveconstants.DEFAULT_IPAM_HOST
@@ -44,24 +42,25 @@ try:
 except ImportError:
     pass
 
-
+# File class from user fdb on StackOverflow
+# http://stackoverflow.com/questions/5896079/python-head-tail-and-backward-read-by-lines-of-a-text-file
 class File(file):
     """ An helper class for file reading  """
-    
+
     def __init__(self, *args, **kwargs):
         super(File, self).__init__(*args, **kwargs)
         self.BLOCKSIZE = 4096
-        
+
     def head(self, lines_2find=1):
-        self.seek(0)                                               # Rewind file
+        self.seek(0)  # Rewind file
         return [super(File, self).next() for x in xrange(lines_2find)]
-        
+
     def tail(self, lines_2find=1):
-        self.seek(0, 2)                                      # Go to end of file
+        self.seek(0, 2)  # Go to end of file
         bytes_in_file = self.tell()
         lines_found, total_bytes_scanned = 0, 0
         while (lines_2find + 1 > lines_found and
-               bytes_in_file > total_bytes_scanned):
+                bytes_in_file > total_bytes_scanned):
             byte_block = min(
                 self.BLOCKSIZE,
                 bytes_in_file - total_bytes_scanned)
@@ -71,9 +70,9 @@ class File(file):
         self.seek(-total_bytes_scanned, 2)
         line_list = list(self.readlines())
         return line_list[-lines_2find:]
-        
+
     def backward(self):
-        self.seek(0, 2)                         #Go to end of file
+        self.seek(0, 2)  # Go to end of file
         blocksize = self.BLOCKSIZE
         last_row = ''
         while self.tell() != 0:
@@ -94,7 +93,7 @@ class File(file):
 
 
 def ipm(site, ipt):
-    '''
+    """
         ipm(site, ipt):
             site: An IP or Network address in dotted-decimal in a string.
                 e.g. "10.10.8.6" or "10.10.0.0"
@@ -111,10 +110,10 @@ def ipm(site, ipt):
             Note: This works exclusively by manipulating a string of octets
                 in dotted decimal format, and does not in any way account for
                 any real subnetting operations, etc...
-    '''
+    """
     ipt = str(ipt).split('.')
     site = site.split('.')
-    return '.'.join(site[:4-len(ipt)] + ipt)
+    return '.'.join(site[:4 - len(ipt)] + ipt)
 
 
 # TODO: This should really be wrapped in a class
@@ -135,32 +134,33 @@ def site_lookup(sfilter):
 
 
 class IPAMController(object):
-    '''Generic wrapper for JSON objects returned by ipam api'''
+    """Generic wrapper for JSON objects returned by ipam api"""
 
     def __init__(self, ipam, data=None, **kwargs):
-        '''Takes either the JSON data by itself or unpacked keywords.
+        """Takes either the JSON data by itself or unpacked keywords.
         if unpacked values are passed, ensure only the 'data' portion
         of the result is sent.  i.e.:
             rslt = ipam.read_subnets(id=1)
             rslt = json.loads(rslt)['data']
             subnet
-        '''
+        """
         self.ipam = ipam
         if data is not None:
             kwargs = json.loads(data)['data']
-        
+
         # Unsure if this is consistent or not, but I've seen it at least once
-        if type(kwargs) is list:  
+        if type(kwargs) is list:
             kwargs = kwargs[0]
 
         for k, v in kwargs.items():
             setattr(self, k, v)
-        
+
 
 class IPAMSubnet(IPAMController):
-    '''Wrap subnet JSON objects that come from phpipam'''
+    """Wrap subnet JSON objects that come from phpipam"""
+
     def __init__(self, **kwargs):
-        super(IPAMSubnet, self).__init__(**kwargs)
+        IPAMController.__init__(self, **kwargs)
 
         net, mask = self.subnet, self.mask
         try:
@@ -170,8 +170,8 @@ class IPAMSubnet(IPAMController):
         self._site_codes = []
 
     def _pull_site_codes(self):
-        id = self.id
-        addresses = self.ipam.generic('addresses', 'read', subnetId=id, format='ip')
+        subnet_id = self.id
+        addresses = self.ipam.generic('addresses', 'read', subnetId=subnet_id, format='ip')
         addresses = json.loads(addresses)['data']
         names = (x['dns_name'] for x in addresses)
         site_codes = (x[5:8] for x in names)
@@ -179,23 +179,24 @@ class IPAMSubnet(IPAMController):
 
     @property
     def site_codes(self):
-        if len(_site_codes) == 0:
+        if len(self._site_codes) == 0:
             self._pull_site_codes()
 
-        return self._site_codes()
-    
+        return self._site_codes
+
     def __str__(self):
         return str(self.network)
 
 
 class IPAM(phpipam.PHPIPAM):
-    '''Handle subnets and addresses meaningfully'''
-    def __init__(self,                                                   
+    """Handle subnets and addresses meaningfully"""
+
+    def __init__(self,
                  url=DEFAULT_IPAM_HOST,
                  api_id=DEFAULT_IPAM_API_ID,
                  api_key=DEFAULT_IPAM_API_KEY,
                  scheme='https'):
-        super(IPAM, self).__init__(url, api_id, api_key)
+        phpipam.PHPIPAM.__init__(self, url, api_id, api_key)
         self.scheme = scheme
         self._subnets = None
         self._raw_subnets = None
@@ -205,7 +206,7 @@ class IPAM(phpipam.PHPIPAM):
         rslt = self.read_subnets()
         jload = json.loads(rslt)
         self._raw_subnets = jload['data']
-    
+
     @property
     def raw_subnets(self):
         if self._raw_subnets is None:
@@ -216,16 +217,15 @@ class IPAM(phpipam.PHPIPAM):
         self._subnets = {}
         for subnet in self.raw_subnets:
             self._subnets[subnet[u'id']] = IPAMSubnet(ipam=self, **subnet)
-        
 
     @property
-    def subnets(self, id=None):
-        '''access one or all subnets'''
+    def subnets(self, subnet_id=None):
+        """access one or all subnets"""
         if self._subnets is None:
             self._pull_subnets()
 
-        if id is not None:
-            return self._subnets[id]
+        if subnet_id is not None:
+            return self._subnets[subnet_id]
 
         return self._subnets
 
@@ -240,7 +240,8 @@ class IPAM(phpipam.PHPIPAM):
                 print e
         return rslt
 
-# Wrapps clSwitch() with features that are great for interactive access, 
+
+# Wrapps clSwitch() with features that are great for interactive access,
 # but would be terrible to use in an normal script.
 class clintSwitch(sshutil.clSwitch):
     def __init__(self, ip=None, creds=None, timeout=None):
@@ -248,7 +249,7 @@ class clintSwitch(sshutil.clSwitch):
             self.timeout = timeout
         elif not hasattr(self, 'timeout'):
             self.timeout = None
-        
+
         if creds:
             clintSwitch.credentials = creds
         else:
@@ -269,15 +270,15 @@ class clintSwitch(sshutil.clSwitch):
         else:
             ip = 'None'
         sshutil.clSwitch.__init__(self, ip, creds)
-        
+
     def pexecute(self, cmd, trim=True, timeout=None):
         args = [cmd, trim]
         if not timeout:
             timeout = self.timeout
-         
+
         if timeout:
             args.append(timeout)
-        
+
         print self.Execute(*args)
 
     def interact(self):
@@ -292,21 +293,21 @@ class clintSwitch(sshutil.clSwitch):
 
 
 def poll(sw, cmd, sleep_time):
-    '''sw.pexecute(cmd) every sleep_time seconds'''
-      
+    """sw.pexecute(cmd) every sleep_time seconds"""
+
     while True:
         sw.pexecute(cmd)
         time.sleep(sleep_time)
 
 
 def pythonrc():
-    '''Return expanded path to current users .pythonrc.py'''
+    """Return expanded path to current users .pythonrc.py"""
     home = os.path.expanduser('~/')
     return home + '.pythonrc.py'
 
 
 def retrieve_pcaps(sw):
-    destcreds = sshutil.GetCredentials()
+    destcreds = sshutil.get_credentials()
     host = DEFAULT_HOST_IP
     lines = sw.Execute('sh flash: | i pcap').splitlines()
     files = [line.split()[-1] for line in lines]
@@ -319,4 +320,71 @@ def retrieve_pcaps(sw):
         sw.pexecute('\n')
         sw.pexecute('\n')
         sw.pexecute(destcreds[1], 5)
+
+def get_riverbed_interfaces(rb):
+    rslt = rb.Execute('show interface', timeout=1)
+    while rslt.find('>') < 0:
+        time.sleep(.5)
+        rslt += rb.bufferflush()
+    rslt = rslt[:rslt.rfind('\r\n')]
+    entries = rslt.split('\r\nInterface')[1:]
+    ifaces = dict()
+    for entry in entries:
+        entry_dict = dict()
+        entry = filter(bool, entry.splitlines())
+        entry_dict['Name'] = entry.pop(0).split()[0]
+        for line in entry:
+            line = line.split(':', 1)
+            try:
+                k, v = map(str.strip, line)
+                entry_dict[k] = v
+            except:
+                print entry_dict['Name']
+                pprint(entry)
+                pprint(line)
+                pprint((k, v))
+                raise
+
+        ifaces[entry_dict['Name']] = entry_dict
+    return ifaces
+
+def get_riverbed_traffic_stats(rb, interface):
+    ifaces = get_riverbed_interfaces(rb)
+    return [x for x in ifaces[interface].items() if x[0][1] == 'X']
+
+def poll_riverbed_stats(rb, interface, run_time):
+    start_time = time.time()
+    interval = run_time / 10
+    interval = max(interval, 15)
+    interval = min(interval, 60*5)
+    interval = int(interval)
+    run_time += 9  # approx time it takes to poll once
+    first_run = None
+    while time.time() <= start_time + run_time:
+        stats = get_riverbed_traffic_stats(rb, interface)
+        if first_run is None:
+            first_run = stats
+        print 'Stats after {0} seconds'.format(time.time() - start_time)
+        pprint(stats)
+        time.sleep(interval)
+    end_time = time.time() - interval
+    run_time = end_time - start_time
+    delta_stats = []
+    for first, last in zip(first_run, stats):
+        delta = first[0], int(last[1]) - int(first[1])
+        delta_stats.append(delta)
+
+    rate_stats = []
+    for stat in delta_stats:
+        rate = stat[0], stat[1] / run_time
+        rate_stats.append(rate)
+
+    print 'Final Stats after {0} seconds:'.format(run_time)
+    pprint(stats)
+    print 'Delta'
+    pprint(delta_stats)
+    print 'Rates'
+    pprint(rate_stats)
+
+    return stats, delta_stats, rate_stats
 

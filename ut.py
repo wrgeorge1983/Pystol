@@ -35,13 +35,13 @@ class sshutilFINtc(unittest.TestCase):
             for dirtyPrefix in DirtyInputs:
                 for suffix in self.FIN_suffixes:
                     dirtyInput = dirtyPrefix + suffix
-                    rslt = sshutil.FormatInterfaceName(dirtyInput, short=True)
+                    rslt = sshutil.format_interface_name(dirtyInput, short=True)
                     # print dirtyInput, rslt
                     self.assertEqual(rslt, ShortPrefix + suffix, 'failed: {0}'
                                      ' didn\'t return {1}'
                                      ''.format(rslt, ShortPrefix + suffix))
             for dirty in ['', None]:
-                rslt = sshutil.FormatInterfaceName(dirty, short=True)
+                rslt = sshutil.format_interface_name(dirty, short=True)
                 self.assertEqual(rslt, dirty, 'failed: {0} didn\'t return '
                                  '{1}'.format(rslt, dirty))
 
@@ -54,12 +54,12 @@ class sshutilFINtc(unittest.TestCase):
                 for suffix in self.FIN_suffixes:
                     # print dirtyPrefix, dirtyPrefix[:2], suffix
                     dirtyInput = dirtyPrefix + suffix
-                    rslt = sshutil.FormatInterfaceName(dirtyInput, short=False)
+                    rslt = sshutil.format_interface_name(dirtyInput, short=False)
                     self.assertEqual(rslt, LongPrefix + suffix, 'failed: {0}'
                                      ' didn\'t return {1}'
                                      ''.format(rslt, LongPrefix + suffix))
             for dirty in ['', None]:
-                rslt = sshutil.FormatInterfaceName(dirty, short=False)
+                rslt = sshutil.format_interface_name(dirty, short=False)
                 self.assertEqual(rslt, dirty, 'failed: {0} didn\'t return '
                                  '{1}'.format(rslt, dirty))
 

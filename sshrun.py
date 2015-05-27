@@ -9,7 +9,7 @@ import sys
 import getopt
 
 # Imports from other scripts in this project
-from sshutil import Listify, GetCredentials, DateTime
+from sshutil import listify, get_credentials, DateTime
 from sshexecute import sshrun
 
 
@@ -75,14 +75,14 @@ def main(argv):
         hosts = raw_input('Enter single hostname or IP address (If you want '
                           'multiple hosts, re-run with -T or --hostfile:\n')
 
-    hosts = Listify(hosts)
+    hosts = listify(hosts)
 
     if not command:                 # Prompt for command if none present
         command = raw_input('Enter the command you would like to run on the'
                             ' destination machine(s)\n')
 
     # Get Credentials, use provided username if available
-    creds = GetCredentials(username)
+    creds = get_credentials(username)
 
     for host in hosts:
         print ("""**Time: {0}
