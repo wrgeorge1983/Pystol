@@ -11,6 +11,7 @@ import time
 import multiprocessing
 import socket
 import re
+from collections import namedtuple
 
 # Imports from other scripts in this project
 from metrics import UpdateMetric
