@@ -292,7 +292,7 @@ class clintSwitch(sshutil.clSwitch):
         return rslt
 
 
-def poll(sw, cmd, sleep_time):
+def poll_switch(sw, cmd, sleep_time):
     """sw.pexecute(cmd) every sleep_time seconds"""
 
     while True:
