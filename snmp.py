@@ -272,7 +272,7 @@ def create_row(label, current_stats, last_stats=None, first_stats=None):
         dls = cs - ls  # delta last_stats to current_stats
         dfs = cs - fs  # delta first_stats to current_stats
 
-        row[1] = dfs.input.duration  # TODO: This is silly
+        row[1] = dfs.site_in.duration  # TODO: This is silly
 
         row.extend((dls.hri, dls.hro,
                     dfs.hri, dfs.hro,

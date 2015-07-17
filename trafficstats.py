@@ -236,6 +236,9 @@ class InterfaceStat(object):
         return cls(name=name, inbound=inbound, outbound=outbound,
                    invert_wan_lan=invert_wan_lan)
 
+    @property
+    def start_time(self):
+        return (self.inbound.start_time + self.outbound.start_time) / 2
 
     @property
     def site_in(self):

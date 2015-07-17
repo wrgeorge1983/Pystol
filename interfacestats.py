@@ -55,12 +55,12 @@ def main(argv):
                                                         "csv=",
                                                         "help"])
     except getopt.GetoptError:
-        print 'error in processing arguments'
+        print('error in processing arguments')
         sys.exit(2)
 
     for opt, arg in opts:
         if opt in ('-h', '--help'):
-            print main.__doc__
+            print(main.__doc__)
             sys.exit()
         elif opt in ("-t", "--host"):
             if hostfile is None:
