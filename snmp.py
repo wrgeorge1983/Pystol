@@ -1,9 +1,11 @@
-__author__ = 'William.George'
+import collections
+
+__author__ = 'William George'
 __version__ = '0.05'
 
 # Standard Library
 import time
-from collections import namedtuple
+import collections.abc
 from itertools import starmap, repeat
 
 # Third Party
@@ -68,6 +70,7 @@ class SNMPInterfaceStats(object):
         self._interface_stats = dict()
         self._interpreted_results = []
         self._result_dict = {}
+        self.vc = ValueConverter(ValueConverter.default_converter)
 
     def pysnmp_init(self):
         self.host = cmdgen.UdpTransportTarget((self.host_string, self.udp_port))
@@ -116,10 +119,11 @@ class SNMPInterfaceStats(object):
         Use self._interpreted_results if that's not desirable.
         :return: [['interface name', bytes_in, bytes_out]]
         """
+        vc = self.vc
         if self.update_permitted:
             interfaces = []
             for raw_interface in self.raw_snmp_results:
-                interface = [extract_snmp_value(x[1]) for x in raw_interface]
+                interface = [vc.convert(x[1]) for x in raw_interface]
                 interfaces.append(interface)
             self._interpreted_results = interfaces
 
@@ -168,34 +172,90 @@ class SNMPInterfaceStats(object):
         """ Pass index operations through to result_dict"""
         return self.result_dict[item]
 
+class ValueConverter(collections.defaultdict):
+    """
+    Class to convert/reduce variety of specialized pysnmp types into basic
+        python types.
+
+    Implemented as a defaultdict with added methods:
+
+    register(): preferred interface for adding types
+    convert(): preferred interface for conversion
+
+    """
+
+    def convert(self, o):
+        return self[type(o)](o)
+
+    def register(self, o_type, func):
+        try:
+            if not issubclass(o_type, (type, object)):
+                raise TypeError
+        except TypeError:
+            raise TypeError('Can only register types and classes')
+
+        self[o_type] = func
+
+    @staticmethod
+    def default_converter(o):
+        def test_type(type_string, new_type, var):
+            f = lambda x: x.find(type_string) >= 0
+
+            m = map(str,var.__class__.mro()) # to str
+            m = map(str.lower, m)  # .lower()
+            m = map(f, m)  # contains 'type_string'?
+            if any(m):
+                return new_type(var)
+            else:
+                return False
+
+        def test_types(converter_list, var):
+            args = (x + (var, ) for x in converter_list)
+            m = starmap(test_type, args)
+            return m
+
+        def extract_value(var):
+            converter_list = (
+                ('integer', int),
+                ('float', float)
+                )
+            m = test_types(converter_list, var)
+            l = list(filter(None, m))
+            return l[0] if l else str(var)
+
+        return extract_value(o)
+
+        pass
+
+
+    @property
+    def _args(self):
+        """
+        :return: dict of parameters needed to recreate this object
+        """
+        _dict = dict(default_factory=self.default_factory)
+        _dict.update(self)
+        return _dict
+
+    def __repr__(self):
+        args = ('{0}={1}'.format(k, v) for k, v in self._args.items())
+        key = lambda k: int('default_factory' in k) * -1
+        args = sorted(sorted(args), key=key)  # always list default_factory first
+        args = ', '.join(args)
+
+        rslt = '{0}({1})'.format(self.__class__.__name__, args)
+        return rslt
+
 
 def extract_snmp_value(var):
-    def test_type(type_string, new_type, var):
-        f = lambda x: x.find(type_string) >= 0
+    """
+    Convert/reduce variety of specialized pysnmp types into basic
+        python types.
+    :param var: SNMP Object to extract
+    :return: converted object
+    """
 
-        m = map(str,var.__class__.mro()) # to str
-        m = map(str.lower, m)  # .lower()
-        m = map(f, m)  # contains 'type_string'?
-        if any(m):
-            return new_type(var)
-        else:
-            return False
-
-    def test_types(converter_list, var):
-        args = (x + (var, ) for x in converter_list)
-        m = starmap(test_type, args)
-        return m
-
-    def extract_value(var):
-        converter_list = (
-            ('integer', int),
-            ('float', float)
-            )
-        m = test_types(converter_list, var)
-        l = list(filter(None, m))
-        return l[0] if l else str(var)
-
-    return extract_value(var)
+    pass
 
 def poll_and_compare(A, B, duration=30):
     """
