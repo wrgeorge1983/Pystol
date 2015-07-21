@@ -350,39 +350,48 @@ def update_stats_table(stats_dict):
         ("T. bps Out", "d_fs", "hro_vot"),
         # ("T. Throughput", )
     ]
+    try:
+        table = stats_dict['table']
+    except IndexError:
+        table = stats_dict['table'] = prettytable.PrettyTable(
+            [label for label, *_ in columns]
+        )
+        first_run = True
+    else:
+        first_run = False
 
-    table = stats_dict.get('table', prettytable.PrettyTable(
-        [label for label, *_ in columns]
-    ))
+    this_run = 0  # TODO: REPLACE LAST_RUN with real data
 
+    this_run = stats_dict['runs'][this_run]
 
+    for host_stats in this_run:
+        label = '{0} initial:' if first_run else '{0} :'
+
+        label = label.format(host_stats['label'])
+
+        row = create_row(label, columns, host_stats)
+        table.add_row(row)
 
     stats_dict['table'] = table  # only strictly necessary on first run, but don't care.
 
 
-def create_row(label, current_stats, last_stats=None, first_stats=None):
+def create_row(row_label, columns, host_stats):
+    """
+    Create rows for a table IAW the spec in columns
+    (format defined in snmp.update_stats_table())
 
-    cs, ls, fs = current_stats, last_stats, first_stats  # InterfaceStat objects
-    cs.to_bits()
-    current_time = cs.start_time
-    row = [label, current_time]
-    row.extend((cs.site_in.hr, cs.site_out.hr))
-    if ls is not None:
-        ls.to_bits(), fs.to_bits()
-        dls = cs - ls  # delta last_stats to current_stats
-        dfs = cs - fs  # delta first_stats to current_stats
+    :param columns: column spec
+    :param stats_run:   dict() of objects referenced in column spec
+    :return:  List of strings for table output.
+    """
+    row = [row_label, ]
 
-        row[1] = dfs.site_in.duration  # TODO: This is silly
+    for _, key, attr in columns:
+        o = host_stats[key]
+        value = getattr(o, attr, None)
+        row.append(value)
 
-        row.extend((dls.hri, dls.hro,
-                    dfs.hri, dfs.hro,
-                    dfs.hri_vot, dfs.hro_vot))
-    else:
-        row.extend(repeat(None, 6))
-
-    row_rslt = [safe_decimal(item) for item in row]
-
-    return row_rslt
+    return row
 
 
 def safe_decimal(o):
