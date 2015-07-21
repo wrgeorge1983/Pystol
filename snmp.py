@@ -326,6 +326,40 @@ def poll_and_compare(target_a, target_b, duration=30):
     return rows
 
 
+def update_stats_table(stats_dict):
+    """
+    Given stats in stats_dict, will create or update table with new rows.
+    Will not perform any reordering of stats (in <-> out, etc)
+
+    :param stats_dict: dict containing referenced objects.
+    :return: stat_dict updated with {'table': PrettyTable}
+    """
+    # columns doesn't include first column, specified later
+    columns = [
+        # (label, key, attribute of value or None for repr(value))
+        ("Time", "d_fs", "duration"),
+        # TODO: replace 'bits in' with something that gives right amount of significant digits
+        ("I. Delta In", "d_ls", "hri"),
+        ("I. Delta Out", "d_ls", "hro"),
+        ("I. bps In", "d_ls", "hri_vot"),
+        ("I. bps Out", "d_ls", "hro_vot"),
+        # ("I. Throughput", )
+        ("T. Delta In", "d_fs", "hri"),
+        ("T. Delta Out", "d_fs", "hro"),
+        ("T. bps In", "d_fs", "hri_vot"),
+        ("T. bps Out", "d_fs", "hro_vot"),
+        # ("T. Throughput", )
+    ]
+
+    table = stats_dict.get('table', prettytable.PrettyTable(
+        [label for label, *_ in columns]
+    ))
+
+
+
+    stats_dict['table'] = table  # only strictly necessary on first run, but don't care.
+
+
 def create_row(label, current_stats, last_stats=None, first_stats=None):
 
     cs, ls, fs = current_stats, last_stats, first_stats  # InterfaceStat objects

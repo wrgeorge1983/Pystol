@@ -74,7 +74,7 @@ class TrafficStat(object):
     Store and represent unidirectional traffic statistic in a number of useful ways.
     """
     def __init__(self, val, unit='b', base='bin', magnitude=10,
-                 start_time=0, duration=0, end_time=0):
+                 start_time=0, duration=1, end_time=0):
         """
         :param val: Raw value in 'units'
         :param unit: ('b' | 'B') for bits or bytes.
