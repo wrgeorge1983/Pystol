@@ -247,7 +247,7 @@ class clNetworkDevice(object):
     def __init__(self, ip='None', creds=None):  # str ip
         self._ip = 'None'
         self.ip = ip
-        if not creds:
+        if creds is None:
             raise SyntaxError('No Credentials Specified')
         self.credentials = creds
         self.goodstates = ['UNK', 'UP']
