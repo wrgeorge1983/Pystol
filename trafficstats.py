@@ -3,10 +3,13 @@ __version__ = '0.01'
 
 # Standard Library
 import time
+import decimal
 from functools import partial
 
 # Third Party
 import prettytable
+
+D = decimal.Decimal
 
 def mirror(x,y):
     return (x,y), (y,x)
@@ -232,7 +235,8 @@ class InterfaceStat(object):
         """
         snmp_results = snmp_is[interface_name]  # calling __getitem__ initializes
                                                 # collection_time
-        constructor = partial(TrafficStat,unit=unit, start_time=snmp_is.collection_time)
+        constructor = partial(TrafficStat,unit=unit, start_time=snmp_is.collection_time,
+                              base='dec')
 
         inbound, outbound = tuple(map(constructor, snmp_results))
         return cls(name=interface_name, inbound=inbound, outbound=outbound,

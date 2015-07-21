@@ -6,6 +6,7 @@ __version__ = '0.05'
 # Standard Library
 import time
 import collections.abc
+import decimal
 from itertools import starmap, repeat
 
 # Third Party
@@ -15,6 +16,8 @@ import prettytable
 # Local
 from . import trafficstats
 
+D = decimal.Decimal
+decimal.getcontext().prec = 6
 cmdGen = cmdgen.CommandGenerator()
 InterfaceStat = trafficstats.InterfaceStat
 
@@ -343,8 +346,16 @@ def create_row(label, current_stats, last_stats=None, first_stats=None):
     else:
         row.extend(repeat(None, 6))
 
-    return row
+    row_rslt = [safe_decimal(item) for item in row]
 
+    return row_rslt
+
+
+def safe_decimal(o):
+    try:
+        return D(o) * 1  # force precision
+    except (TypeError, decimal.InvalidOperation):
+        return o
 
 
 def quick_compare(A, B, duration=10):
