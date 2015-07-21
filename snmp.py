@@ -285,10 +285,9 @@ def poll_and_compare(A, B, duration=30):
     while True:
         current_time = time.time()
         current_stats_a = InterfaceStat.from_stats(interface_a, host_a[interface_a],
-                                                      unit='B', start_time=current_time)
+                                                   unit='B', start_time=current_time)
         current_stats_b = InterfaceStat.from_stats(interface_b, host_b[interface_b],
-                                                      unit='B', start_time=current_time)
-
+                                                   unit='B', start_time=current_time)
 
         if first_stats_a is None:
             start_time = current_time
