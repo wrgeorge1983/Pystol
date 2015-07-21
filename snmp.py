@@ -32,7 +32,7 @@ def tuplify(obj):
 
 class SNMPInterfaceStats(object):
     """
-    Wraps SNMP interface statistic results from pysnmp
+    Wraps SNMP interface statistic results from pysnmp and controlls their polling
     """
     def __init__(self, host, community, mibs=None, port=161, minimum_age=10,
                  maximum_age=300):
@@ -48,7 +48,7 @@ class SNMPInterfaceStats(object):
         """
         default_mibs = 'ifDescr', 'ifHCInOctets', 'ifHCOutOctets'
 
-        self.time = 0.0
+        self.collection_time = 0.0
         self.minimum_age = minimum_age
 
         self.host = None
@@ -70,7 +70,7 @@ class SNMPInterfaceStats(object):
         self._interface_stats = dict()
         self._interpreted_results = []
         self._result_dict = {}
-        self.vc = ValueConverter(ValueConverter.default_converter)
+        self.vc = ValueConverter(lambda: ValueConverter.default_converter)
 
     def pysnmp_init(self):
         self.host = cmdgen.UdpTransportTarget((self.host_string, self.udp_port))
@@ -86,7 +86,7 @@ class SNMPInterfaceStats(object):
         a request
         :return: True if self.minimum_age seconds have passed, else False
         """
-        if time.time() < self.time + self.minimum_age:
+        if time.time() < self.collection_time + self.minimum_age:
             return False
         else:
             return True
@@ -107,7 +107,7 @@ class SNMPInterfaceStats(object):
                 *self.mibs,
                 lookupValues=True
             )
-            self.time = time.time()
+            self.collection_time = time.time()
 
         return self._raw_snmp_result
 
@@ -163,8 +163,8 @@ class SNMPInterfaceStats(object):
         """
         for interface in self.interpreted_snmp_results:
             self._interface_stats[interface[0]] = InterfaceStat.from_stats(
-                name=interface[0],
-                in_out_tuple=(interface[1], interface[2]),
+                interface_name=interface[0],
+                snmp_is=(interface[1], interface[2]),
                 unit='B', start_time=time.time()
             )
 
@@ -185,7 +185,8 @@ class ValueConverter(collections.defaultdict):
     """
 
     def convert(self, o):
-        return self[type(o)](o)
+        func = self[type(o)]
+        return func(o)
 
     def register(self, o_type, func):
         try:
@@ -257,16 +258,16 @@ def extract_snmp_value(var):
 
     pass
 
-def poll_and_compare(A, B, duration=30):
+def poll_and_compare(target_a, target_b, duration=30):
     """
     given a pair of (dict,key) tuples, compare their values over time.
-    :param A: (SNMPInterfaceStats(), 'interface_name')
-    :param B: (SNMPInterfaceStats(), 'interface_name')
+    :param target_a: (SNMPInterfaceStats(), 'interface_name')
+    :param target_b: (SNMPInterfaceStats(), 'interface_name')
     :param duration:  Time to run comparison in seconds
     :return:
     """
-    host_a, interface_a = A
-    host_b, interface_b = B
+    snmpis_a, interface_a = target_a
+    snmpis_b, interface_b = target_b
 
     increment = 10
     # If we're out of time by less than a second, it's probably because the timers
@@ -278,18 +279,21 @@ def poll_and_compare(A, B, duration=30):
                                              'Total Change In', 'Total Change Out',
                                              'Total bps in', 'Total bps out'])
     rows = []
-    first_stats_a = None  # sentinel for detecting first pass
+    first_run = True  # sentinel for detecting first pass
+
+    last_stats_a, first_stats_a, last_stats_b, first_stats_b = repeat(None, 4)
 
     # Moved test to the bottom so we don't wast time sleeping if
     # we're just going to return
     while True:
         current_time = time.time()
-        current_stats_a = InterfaceStat.from_stats(interface_a, host_a[interface_a],
-                                                   unit='B', start_time=current_time)
-        current_stats_b = InterfaceStat.from_stats(interface_b, host_b[interface_b],
-                                                   unit='B', start_time=current_time)
+        current_stats_a = InterfaceStat.from_stats(interface_a, snmpis_a,
+                                                   unit='B')
+        current_stats_b = InterfaceStat.from_stats(interface_b, snmpis_b,
+                                                   unit='B')
 
-        if first_stats_a is None:
+        if first_run is True:
+            first_run = False
             start_time = current_time
             last_stats_a, first_stats_a = (current_stats_a, ) * 2
             last_stats_b, first_stats_b = (current_stats_b, ) * 2
@@ -321,7 +325,7 @@ def poll_and_compare(A, B, duration=30):
 
 def create_row(label, current_stats, last_stats=None, first_stats=None):
 
-    cs, ls, fs = current_stats, last_stats, first_stats
+    cs, ls, fs = current_stats, last_stats, first_stats  # InterfaceStat objects
     cs.to_bits()
     current_time = cs.start_time
     row = [label, current_time]
