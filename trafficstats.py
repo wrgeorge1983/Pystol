@@ -77,7 +77,7 @@ class TrafficStat(object):
                  start_time=0, duration=1, end_time=0):
         """
         :param val: Raw value in 'units'
-        :param unit: ('b' | 'B') for bits or bytes.
+        :param unit: ('b' | 'B') for bits or bytes.  This describes the data coming IN!
         :param base: ('bin' | 'dec') for binary or decimal
         :param magnitude: Maximum magnitude of units in human_readable format.
             e.x.: 1 will always express numbers in kilo-units, 2 always gives mega-units
@@ -235,7 +235,7 @@ class InterfaceStat(object):
         """
         snmp_results = snmp_is[interface_name]  # calling __getitem__ initializes
                                                 # collection_time
-        constructor = partial(TrafficStat,unit=unit, start_time=snmp_is.collection_time,
+        constructor = partial(TrafficStat, unit=unit, start_time=snmp_is.collection_time,
                               base='dec')
 
         inbound, outbound = tuple(map(constructor, snmp_results))
@@ -245,6 +245,10 @@ class InterfaceStat(object):
     @property
     def start_time(self):
         return (self.inbound.start_time + self.outbound.start_time) / 2
+
+    @property
+    def duration(self):
+        return (self.inbound.duration + self.outbound.duration) / 2
 
     @property
     def site_in(self):
@@ -295,9 +299,11 @@ class InterfaceStat(object):
         self.outbound.to_bytes()
 
     def match_other(self, other):
-        match = all((self.name == other.name,
-                     self.invert_wan_lan == other.invert_wan_lan))
-        assert match, 'Names and invert settings must match to compare stats!'
+        match = ((self.name, self.invert_wan_lan) ==
+                 (other.name, other.invert_wan_lan))
+        assert match, ('Names and invert settings must match to compare stats!'
+            '{0} vs. {1}'.format((self.name, self.invert_wan_lan),
+                                 (other.name, other.invert_wan_lan)))
 
     def __add__(self, other):
         self.match_other(other)

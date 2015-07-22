@@ -261,69 +261,74 @@ def extract_snmp_value(var):
 
     pass
 
-def poll_and_compare(target_a, target_b, duration=30):
+def poll_and_compare(*targets, duration=30, swap_wan_lan=True):
     """
-    given a pair of (dict,key) tuples, compare their values over time.
-    :param target_a: (SNMPInterfaceStats(), 'interface_name')
-    :param target_b: (SNMPInterfaceStats(), 'interface_name')
+    given a pair of (SNMPInterfaceStat, 'interface_name') tuples,
+        compare their values over time.
+    :param targets: ((SNMPInterfaceStats(), 'interface_name'), ...)
+        count should == 2
     :param duration:  Time to run comparison in seconds
+    :param swap_wan_lan:    Swap the in/out direction of every other target
     :return:
     """
-    snmpis_a, interface_a = target_a
-    snmpis_b, interface_b = target_b
-
     increment = 10
-    # If we're out of time by less than a second, it's probably because the timers
-    # are precise, and overhead inside this function has a non-zero cost, so add
-    # in some slack.
-    result_table = prettytable.PrettyTable( ['Set', 'Time',
-                                             'Bits In', 'Bits Out',
-                                             'Change In', 'Change Out',
-                                             'Total Change In', 'Total Change Out',
-                                             'Total bps in', 'Total bps out'])
-    rows = []
-    first_run = True  # sentinel for detecting first pass
+    if (duration / increment) < 3:
+        increment = duration / 3  # at least 3 intervals
 
-    last_stats_a, first_stats_a, last_stats_b, first_stats_b = repeat(None, 4)
+    stats_dict = {}  # dict of stats
+    runs = stats_dict['runs'] = []  # list of runs
+    first_run = True
 
-    # Moved test to the bottom so we don't wast time sleeping if
-    # we're just going to return
     while True:
-        current_time = time.time()
-        current_stats_a = InterfaceStat.from_stats(interface_a, snmpis_a,
-                                                   unit='B')
-        current_stats_b = InterfaceStat.from_stats(interface_b, snmpis_b,
-                                                   unit='B')
+        run_start_time = time.time()
+        swap = swap_wan_lan
+        # collect stats for run
 
-        if first_run is True:
-            first_run = False
-            start_time = current_time
-            last_stats_a, first_stats_a = (current_stats_a, ) * 2
-            last_stats_b, first_stats_b = (current_stats_b, ) * 2
-            rows.append(create_row('A initial:', current_stats_a))
-            rows.append(create_row('B initial:', current_stats_b))
+        run = []  # list of hosts
+        runs.append(run)
+        for interface_stats, interface_name in targets:
+            swap = not swap
+            label = interface_stats.host_string
+            cs = InterfaceStat.from_stats(interface_name, interface_stats,
+                                          invert_wan_lan=swap, unit='B')
+            # cs = current_stats
+            cs.to_bits()
 
-            [result_table.add_row(x) for x in rows[-2:]]
-            print(result_table)
-            duration += .3
-            time.sleep(increment)
-            continue
 
-        runtime = current_time - start_time
-        rows.append(create_row('A :', current_stats_a,
-                               last_stats_a, first_stats_a))
-        rows.append(create_row('B :', current_stats_b,
-                               last_stats_b, first_stats_b))
-        last_stats_a, last_stats_b = current_stats_a, current_stats_b
+            if first_run:
+                ls, fs = (cs, ) * 2
+                poll_start_time = cs.start_time
+            else:
+                last_run = runs[-2][len(run)]
+                # runs already has our (empty) run appended, so "last" run
+                #   is "two back".
+                # hosts are appended to 'run', and the host we're on hasn't
+                #   been appended yet, so len(run) is the index of the
+                #   current host.
 
-        [result_table.add_row(x) for x in rows[-2:]]
-        print(result_table)
+                ls, fs = [last_run[x] for x in ('ls', 'fs')]
 
-        duration += .3
-        if time.time() + increment > start_time + duration:
+                # last_stats, first_stats
+
+            d_ls, d_fs = cs - ls, cs - fs
+            # delta_from_last_stats, delta_from_first_stats
+
+            host = dict(cs=cs, ls=ls, fs=fs, d_ls=d_ls, d_fs=d_fs,
+                        label=label)
+            run.append(host)
+
+        first_run = False
+        # send stats to update_stats_table
+        update_stats_table(stats_dict)
+        # display table
+        print(stats_dict['table'])
+        # set up for next iteration
+        run_run_time = time.time() - run_start_time
+        duration += (1.1 * run_run_time)  # build in slack so we don't miss a run.
+        if (time.time() + increment) > (poll_start_time + duration):
             break
         time.sleep(increment)
-    return rows
+    return stats_dict
 
 
 def update_stats_table(stats_dict):
@@ -352,25 +357,28 @@ def update_stats_table(stats_dict):
     ]
     try:
         table = stats_dict['table']
-    except IndexError:
+    except KeyError:
         table = stats_dict['table'] = prettytable.PrettyTable(
-            [label for label, *_ in columns]
+            ['label'] + [label for label, *_ in columns]
         )
         first_run = True
     else:
         first_run = False
 
-    this_run = 0  # TODO: REPLACE LAST_RUN with real data
+    this_run = stats_dict['runs'][-1]  # assume last run == most recent == relevant
+    try:
 
-    this_run = stats_dict['runs'][this_run]
+        for host_stats in this_run:
+            label = '{0} initial:' if first_run else '{0} :'
 
-    for host_stats in this_run:
-        label = '{0} initial:' if first_run else '{0} :'
+            label = label.format(host_stats['label'])
 
-        label = label.format(host_stats['label'])
-
-        row = create_row(label, columns, host_stats)
-        table.add_row(row)
+            row = create_row(label, columns, host_stats)
+            table.add_row(row)
+    except Exception as e:
+        import pprint
+        pprint.pprint(stats_dict)
+        raise e
 
     stats_dict['table'] = table  # only strictly necessary on first run, but don't care.
 
