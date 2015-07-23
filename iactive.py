@@ -1,19 +1,21 @@
 #! /usr/bin/python
-'''
+"""
 Created on Mar 26, 2015
 
 @author: William.George
 
 wrapper around _iactive.py to so that we can `relaod(_iactive)` interactively.
 So Meta.
-'''
-# I defend this usage on the premis that this is by definition an interactive session
+"""
+
+# I defend this usage on the premise that this is by definition an interactive session
 # and so getting everything into the namespace is really the point
 from _iactive import *
 
 
 # But then I do this anyway, so that `reload(_iactive)` is easier further down the line.
-import _iactive 
+
+import _iactive
 
 
 # We're going to define some "constants", really just variables.  We define them here, then attempt to import a file that will overwrite them.
