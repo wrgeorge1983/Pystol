@@ -261,7 +261,7 @@ def extract_snmp_value(var):
 
     pass
 
-def poll_and_compare(*targets, duration=30, swap_wan_lan=True):
+def poll_and_compare(*targets, duration=30, swap_wan_lan=True, minute_sync=True):
     """
     given a pair of (SNMPInterfaceStat, 'interface_name') tuples,
         compare their values over time.
@@ -269,6 +269,8 @@ def poll_and_compare(*targets, duration=30, swap_wan_lan=True):
         count should == 2
     :param duration:  Time to run comparison in seconds
     :param swap_wan_lan:    Swap the in/out direction of every other target
+    :param minute_sync:     Don't begin polling until we're near to the start of
+                                a new minute
     :return:
     """
     increment = 10
@@ -278,6 +280,13 @@ def poll_and_compare(*targets, duration=30, swap_wan_lan=True):
     stats_dict = {}  # dict of stats
     runs = stats_dict['runs'] = []  # list of runs
     first_run = True
+
+    while True:
+        if int(time.time()) % 60:
+            time.sleep(0.5)
+            continue
+        print('begin polling')
+        break
 
     while True:
         run_start_time = time.time()

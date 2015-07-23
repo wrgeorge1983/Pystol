@@ -74,7 +74,7 @@ class TrafficStat(object):
     Store and represent unidirectional traffic statistic in a number of useful ways.
     """
     def __init__(self, val, unit='b', base='bin', magnitude=10,
-                 start_time=0, duration=1, end_time=0):
+                 start_time=0, duration=0, end_time=0, **kwargs):
         """
         :param val: Raw value in 'units'
         :param unit: ('b' | 'B') for bits or bytes.  This describes the data coming IN!
@@ -87,13 +87,20 @@ class TrafficStat(object):
         :param end_time: End of period of measurement over time, overrides duration.
         :return:
         """
-        self.val = val
-        self.unit = unit
-        self.base = base
-        self.magnitude = magnitude
+        for key in kwargs:
+            if not (key[:2] == 'o_'):
+                raise TypeError('__init__() got an unexpected keyword argument '
+                                '\'{0}\''.format(key))
 
-        self.start_time = start_time
+        self.val = self.o_val = val
+        self.unit = self.o_unit = unit
+        self.base = self.o_base = base
+        self.magnitude = self.o_magnitude = magnitude
 
+        self.start_time = self.o_start_time = start_time
+
+        self.o_end_time = end_time
+        self.o_duration = duration
         if end_time > 0:
             duration = end_time - start_time
 
@@ -154,6 +161,8 @@ class TrafficStat(object):
         Returns rate over time.
         :return: Rate in (bits | bytes) per second.
         """
+        if self.duration == 0:
+            return 0
         return self.val / self.duration
 
     @property
