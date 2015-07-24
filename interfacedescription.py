@@ -129,7 +129,7 @@ def main(argv):
     CREDENTIALS = get_credentials(username)
 
     metrics.Clock(True)
-    switches = PrepairSwitches(hosts, CREDENTIALS, DEFAULT_GATEWAY)
+    switches = PrepareSwitches(hosts, CREDENTIALS, DEFAULT_GATEWAY)
 
     oBuffer = ''
     for switch in switches:
@@ -256,7 +256,7 @@ def PrepairDescripiton(switchport):
     return description
 
 
-def PrepairSwitches(hosts, creds, defaultgateway):
+def PrepareSwitches(hosts, creds, defaultgateway):
     '''
         Given host,creds,defaultgateway, call switchuserinfo.process_end_devices
         use 'switch' strings in each EndDevice to populate list of switches,
@@ -264,7 +264,7 @@ def PrepairSwitches(hosts, creds, defaultgateway):
         create device.switchport.  device.switchport property handles linking
         return list of switches
     '''
-    metrics.DebugPrint('interfacedescription.py:PrepairSwitches()', 2)
+    metrics.DebugPrint('interfacedescription.py:PrepareSwitches()', 2)
     switches = []
 
     for host in hosts:
@@ -276,14 +276,14 @@ def PrepairSwitches(hosts, creds, defaultgateway):
     else:
         switches = PopulateSwitchesST(switches)
 
-    metrics.DebugPrint('interfacedescription.py:PrepairSwitches.len(switches):'
+    metrics.DebugPrint('interfacedescription.py:PrepareSwitches.len(switches):'
                        ' {0}'.format(len(switches)), 2)
     ScrubbedSwitches = []
     for sw in switches:
         if sw.state in sw.goodstates:
             ScrubbedSwitches.append(sw)
 
-    metrics.DebugPrint('interfacedescription.py:PrepairSwitches.'
+    metrics.DebugPrint('interfacedescription.py:PrepareSwitches.'
                        'len(ScrubbedSwitches): '
                        '{0}'.format(len(ScrubbedSwitches)), 2)
 

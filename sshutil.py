@@ -253,7 +253,6 @@ class NetworkDevice(object):
         self.credentials = creds
         self.goodstates = ['UNK', 'UP']
         self.state = 'UNK'  # valid states: ['UNK', 'UP', 'DOWN']
-        self.model = 'UNK'
         self.connection = None
 
     @property
@@ -281,10 +280,16 @@ class NetworkDevice(object):
         """
         self._connect()
         UpdateMetric('Switch.execute')
-        lines = self.connection.run(command=command,
-                                    trim=trim,
-                                    timeout=timeout)
-        return lines
+        try:
+            lines = self.connection.run(command=command,
+                                        trim=trim,
+                                        timeout=timeout)
+        except Exception:
+            self.state = 'DOWN'
+            raise
+        else:
+            self.state = 'UP'
+            return lines
 
 
 class Riverbed(NetworkDevice):
@@ -300,8 +305,8 @@ class Switch(NetworkDevice):
         NetworkDevice.__init__(self, ip, creds)
         self.ports = []
         self.devices = []
-        self.CDPinformation = {}
-        self._MACAddressTable = ''
+        self.cdp_information = {}
+        self._mac_address_table = ''
 
     @property
     def hostname(self):
@@ -492,6 +497,12 @@ class Switch(NetworkDevice):
         return self.state
 
     def populate_lite(self):
+        if self.ip == 'None' or not self.credentials:
+            metrics.DebugPrint('Attempt to populate switch data missing IP'
+                               'and/or creds', 3)
+            raise Exception('missing IP or creds')
+
+
         self._collect_startup_config()
         self._collect_version()
 
@@ -503,14 +514,14 @@ class Switch(NetworkDevice):
         command = 'sh mac address-table'
         UpdateMetric('Switch.collect_mac_table')
         lines = self.execute(command)
-        self._MACAddressTable = '\n'.join(
+        self._mac_address_table = '\n'.join(
             [x for x in lines.splitlines() if 'dynamic' in x.lower()])
 
     @property
     def mac_table(self):
-        if not self._MACAddressTable:
+        if not self._mac_address_table:
             self.collect_mac_table()
-        table = self._MACAddressTable
+        table = self._mac_address_table
         return table
 
     def _get_interfaces(self, data=False):
@@ -592,7 +603,7 @@ class Switch(NetworkDevice):
         for switchport in self.ports:
             if switchport.name.lower() in CDPEntries:
                 switchport.CDPneigh.append(CDPEntries[switchport.name.lower()])
-        self.CDPinformation = CDPEntries
+        self.cdp_information = CDPEntries
 
     def _classify_ports(self, data=False):
         """

@@ -15,6 +15,7 @@ from pprint import pprint  # Not used here, but we want it in interactive mode.
 import time
 from subprocess import Popen
 from collections import defaultdict
+import multiprocessing.pool
 
 sys.path += [os.getcwd()]
 
@@ -384,8 +385,12 @@ class WorkbookWrapper(object):
         wb = openpyxl.load_workbook(path)
         return wb
 
-    def switch_from_row(self, row_index):
-        row = self.rows[row_index]
+    def switch_from_row(self, row=None, row_index=None):
+        if row is None:
+            assert row_index is not None, "switch_from_row expects row or row_index"
+            row = self.rows[row_index]
+
+        assert row in self.rows, "row must be an existing row in rows"
 
         attrib_from_cell = lambda x: self.header[self.column_from_string(x.column)]
         attrs = dict((attrib_from_cell(cell), cell.value) for cell in row
@@ -395,7 +400,41 @@ class WorkbookWrapper(object):
         switch.row_index = row_index
         return switch
 
+    def switches_from_rows(self):
+        return [self.switch_from_row(row=row) for row in self.rows]
+
     def get_attribs(self, switch):
         pass
+
+
+def populate_switch(switch):
+    try:
+        switch.populate_lite()
+    except:
+        pass
+
+def test_wb_switches():
+    global wb
+    global switches
+    global pool
+    global rslts
+    wb = WorkbookWrapper('bia-netw.xlsx')
+    switches = wb.switches_from_rows()
+    pool = multiprocessing.pool.ThreadPool(processes=32)
+    start_time = time.time()
+    rslts = pool.map_async(populate_switch, switches)
+    increment_table = {100: 5, 50: 3, 25: 1, 10: 0.5}
+    while True:
+        remaining = len([switch for switch in switches if switch.state =='UNK'])
+        if remaining == 0:
+            return
+        seconds = time.time() - start_time
+        print('{0} remaining after {1} seconds'.format(remaining, seconds))
+        for key in sorted(increment_table.keys()):
+            if remaining >= key:
+                increment = increment_table[key]
+            else:
+                break
+        time.sleep(increment)
 
 
