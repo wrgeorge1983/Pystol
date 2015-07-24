@@ -22,12 +22,12 @@ SSH_HOSTS = []
 DEBUG = False
 
 
-class clSSHConnection(object):
+class SSHConnection(object):
     '''Wrapper for paramiko ssh connections.
 
         If created with `interactive=True` will create and maintain a persistant
     session in self.session.  Session is still subject to timeout by remote
-    host, but clSSHConnection will transparently recreate as necessary.  Do not
+    host, but SSHConnection will transparently recreate as necessary.  Do not
     depend on this to preserve state long term.  Primarily intended to save on 
     setup/teardown costs.
 
@@ -69,7 +69,12 @@ class clSSHConnection(object):
             trim = self.trim
         if not command[-1] == '\n':
             command += '\n'
-        chan.send(command)
+        try:
+            chan.send(command)
+        except paramiko.channel.socket.error:
+            self._connect()
+            chan.send(command)
+
         n = 0
         # Max time to wait in any given stretch is timeout seconds
         # Sleep .05s at a time, timeout/.05 intervals
@@ -119,13 +124,15 @@ class clSSHConnection(object):
         
         if not self.session or (self.interactive and
                                 (not self.channel or
-                                 not self.channel.transport.is_active())):
+                                 not self.channel.transport.is_active() or
+                                 self.channel.closed)
+                                ):
             self._NewSSH()
 
     def _NewSSH(self):
         '''Create a new SSH Connection'''
 
-        UpdateMetric('clSSHConnection.NewSSH()')
+        UpdateMetric('SSHConnection.NewSSH()')
         ip = self.ip
         username, password = self.credentials
         interactive = self.interactive
@@ -144,9 +151,9 @@ class clSSHConnection(object):
         self.session = ssh
         if interactive:
             self.channel = ssh.invoke_shell()
-            self.DisablePagingH()
+            self.disable_paging_h()
 
-    def DisablePagingH(self):
+    def disable_paging_h(self):
         '''disable paging behavior for interactive cisco sessions
             "press any key to continue" etc...
         '''
