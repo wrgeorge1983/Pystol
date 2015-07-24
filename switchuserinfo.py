@@ -11,7 +11,7 @@ pseudocode:
 main(hosts):
     macIPpairs=[]
     for host in hosts:
-        endDevices += GetEndDevices(host)
+        endDevices += _get_end_devices(host)
 
     for endDevice in endDevices:
         IP = resolveMAC(endDevice)
@@ -26,7 +26,7 @@ from optparse import OptionParser
 
 # Imports from other scripts in this project
 from sshutil import get_credentials
-from sshutil import clSwitch
+from sshutil import Switch
 import sshutil
 import metrics
 
@@ -130,9 +130,9 @@ def main(argv):
     metrics.DebugPrint('hosts:' + str(hosts), 1)
     switches = []
     for host in hosts:
-        switches.append(clSwitch(ip=host, creds=CREDENTIALS))
+        switches.append(Switch(ip=host, creds=CREDENTIALS))
 
-    endDevices = sshutil.ProcessEndDevices(hosts=switches, creds=CREDENTIALS,
+    endDevices = sshutil.process_end_devices(hosts=switches, creds=CREDENTIALS,
                                            maxThreads=maxThreads,
                                            MultiThreading=MultiThreading,
                                            defaultgateway=defaultGateway)

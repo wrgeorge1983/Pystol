@@ -17,10 +17,10 @@ import time
 import sshutil
 ip = '10.10.10.10'
 creds = sshutil.GetCredentials()
-switch = clSwitch(ip=ip, creds=creds)
+switch = Switch(ip=ip, creds=creds)
 cmd = 'sh env pow all'
 while True:
-    print switch.Execute(cmd)
+    print switch.execute(cmd)
     time.sleep(60)
 ```
 

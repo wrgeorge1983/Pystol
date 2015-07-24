@@ -12,7 +12,7 @@ import multiprocessing.pool
 
 # Imports from other scripts in this project
 from sshutil import get_credentials
-from sshutil import clSwitch
+from sshutil import Switch
 from sshutil import deduplicate_list
 import metrics
 
@@ -94,7 +94,7 @@ def main(argv):
     switches = []
     hosts = deduplicate_list(hosts)
     for host in hosts:
-        switch = clSwitch(ip=host, creds=CREDENTIALS)
+        switch = Switch(ip=host, creds=CREDENTIALS)
         switches.append(switch)
 
     if MAX_THREADS > 1:  # Single or MultiThreaded...
@@ -157,7 +157,7 @@ def PopulateSwitch(switch):
     """
     Wrapper to support multiprocessing.pool.map() syntax
     """
-    switch.Populate()
+    switch.populate()
     return switch
 
 
@@ -180,7 +180,7 @@ def PopulateSwitchesST(switches):
                        '{0}'.format(', '.join(map(str, switches))), 1)
 
     for sw in switches:
-        # use this instead of sw.Populate() for consistency... doesn't
+        # use this instead of sw.populate() for consistency... doesn't
         # really matter.
         PopulateSwitch(sw)
     return switches

@@ -13,7 +13,7 @@ from optparse import OptionParser
 # Imports from other scripts in this project
 from sshexecute import sshrun
 import metrics
-from sshutil import listify, format_mac_address, get_credentials  # , ResolveMAC
+from sshutil import listify, format_mac_address, get_credentials  # , resolve_mac
 import sshutil
 
 
@@ -231,17 +231,17 @@ def ResolveMAC(device, ip, creds):
     command = 'sh arp'
     if not (ip):
         raise Exception('No IP Address specified to resolve!')
-    # DebugPrint('ResolveMAC.defaultgateway: ' + str(defaultgateway))
-    # DebugPrint('ResolveMAC.creds[0]: ' + creds[0])
+    # DebugPrint('resolve_mac.defaultgateway: ' + str(defaultgateway))
+    # DebugPrint('resolve_mac.creds[0]: ' + creds[0])
 
     # ==========================================================================
-    # Assume that device is NOT already a clSwitch Object.  When that is no
+    # Assume that device is NOT already a Switch Object.  When that is no
     # longer the case, change the parameters.
     # ==========================================================================
 
-    device = sshutil.clSwitch(ip=device, creds=creds)
-    lines = device.Execute('ping {0}'.format(ip), timeout=5)
-    line = device.Execute('sh arp | i {0}'.format(ip))
+    device = sshutil.Switch(ip=device, creds=creds)
+    lines = device.execute('ping {0}'.format(ip), timeout=5)
+    line = device.execute('sh arp | i {0}'.format(ip))
 
     if len(line) == 0 or line.split()[3].lower() == 'incomplete':
         return 'Not Found'

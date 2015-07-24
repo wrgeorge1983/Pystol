@@ -11,7 +11,7 @@ import getopt
 import csv
 
 # Imports from other scripts in this project
-from sshutil import get_credentials, clSwitch
+from sshutil import get_credentials, Switch
 from sshutil import deduplicate_list
 from metrics import PrintMetrics
 from metrics import DebugPrint
@@ -98,12 +98,12 @@ def main(argv):
     hosts = deduplicate_list(hosts)
     switches = []
     for host in hosts:
-        switch = clSwitch(ip=host, creds=CREDENTIALS)
+        switch = Switch(ip=host, creds=CREDENTIALS)
         switches.append(switch)
         # we're getting ALL interfaces here, as opposed to non-trunks typically
-        DebugPrint('clSwitch.GetInterfaces(): {0}'
+        DebugPrint('Switch._get_interfaces(): {0}'
                    ''.format(str(switch)))
-        switch.GetInterfaces()
+        switch._get_interfaces()
         oBuffer += switch.ip + '\n'
         for interface in sorted(switch.ports):
             oBuffer += ':' + interface.name + '\n'

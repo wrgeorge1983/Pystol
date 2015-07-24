@@ -78,7 +78,7 @@ def report_status_from_bytes(rx_bytes, tx_bytes, seconds=3600.):
 
 
 def get_riverbed_interfaces(rb):
-    rslt = rb.Execute('show interface', timeout=1)
+    rslt = rb.execute('show interface', timeout=1)
     while rslt.find('>') < 0:
         time.sleep(.5)
         rslt += rb.bufferflush()

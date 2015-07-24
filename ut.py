@@ -84,10 +84,10 @@ class sshutilSwitchTC(unittest.TestCase):
         self.sampleData['IP'] = ['10.217.225.140']
 
     def test_SwitchGetInterfaces(self):
-        sw = sshutil.clSwitch(ip=self.sampleData['IP'][0], creds=None)
+        sw = sshutil.Switch(ip=self.sampleData['IP'][0], creds=None)
         self.assertEqual(sw.state, 'UNK', 'switch.state doesn\'t'
                          'default to "UNK"')
-        sw.GetInterfaces(data=self.sampleData['Interface'][1])
+        sw._get_interfaces(data=self.sampleData['Interface'][1])
         self.assertEqual(sw.state, 'UP', 'switch.state doesn\'t set to "UP"')
         self.assertEqual(len(sw.ports), 55, 'len(switch.ports) == {0}'
                          ''.format(len(sw.ports)))
@@ -108,9 +108,9 @@ class sshutilSwitchTC(unittest.TestCase):
                          ''.format(sw.ports[51], sw.ports[51].description))
 
     def test_SwitchClassifyPorts(self):
-        sw = sshutil.clSwitch(ip=self.sampleData['IP'][0], creds=None)
-        sw.GetInterfaces(data=self.sampleData['Interface'][1])
-        sw.ClassifyPorts(self.sampleData['InterfaceSwitchport'][1])
+        sw = sshutil.Switch(ip=self.sampleData['IP'][0], creds=None)
+        sw._get_interfaces(data=self.sampleData['Interface'][1])
+        sw._classify_ports(self.sampleData['InterfaceSwitchport'][1])
         print sw
         pass
 
@@ -162,13 +162,13 @@ class sshutilSwitchPortTC(unittest.TestCase):
 
     def test_init(self):
         try:
-            sp = sshutil.clSwitchPort()
+            sp = sshutil.SwitchPort()
         except Exception as E:
             self.fail('clswitchport._init_() threw an exception!')
             raise E
 
     def test_get_edge(self):
-        sp = sshutil.clSwitchPort()
+        sp = sshutil.SwitchPort()
         for sample in self.sampleData['get_edge']:
             eRslt = sample[2]  # expected Result
             aRslt = sp._get_edge(sample[0], sample[1])
@@ -179,7 +179,7 @@ class sshutilSwitchPortTC(unittest.TestCase):
             self.assertEqual(eRslt, aRslt, msg)
 
     def test_switchportMode(self):
-        sp = sshutil.clSwitchPort()
+        sp = sshutil.SwitchPort()
         self.assertEqual(sp.switchportMode, 'access', 'clswitchportMode'
                          'default\n    Expected: {0}\n    Returned: {1}\n'
                          ''.format('access', sp.switchportMode))
@@ -228,9 +228,9 @@ def createParser():
     testSuiteHelp = ('What test suite to run.                             '
                      'Default:                                        all '
                      'fin:                    sshutil.formatinterfacename '
-                     'switchgi:                  clSwitch.GetInterfaces() '
-                     'switchcp:                  clSwitch.ClassifyPorts() '
-                     'switchport:          clSwitchPort, multiple methods '
+                     'switchgi:                  Switch._get_interfaces() '
+                     'switchcp:                  Switch._classify_ports() '
+                     'switchport:          SwitchPort, multiple methods '
                      'all:                               self explanatory ')
     parser = OptionParser(usage)
     parser.add_option('-v', '--verbose', action='store_true', dest='verbose')

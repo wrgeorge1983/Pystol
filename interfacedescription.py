@@ -26,7 +26,7 @@ import multiprocessing.pool
 
 # Imports from other scripts in this project
 import sshutil
-from sshutil import get_credentials, clSwitch  # clEndDevice, clSwitchPort
+from sshutil import get_credentials, Switch  # EndDevice, SwitchPort
 from sshutil import Date, DateTime  # DeduplicateList
 import metrics
 
@@ -138,10 +138,10 @@ def main(argv):
             continue
         # metrics.DebugPrint('[{0}].CollectInterfaceDescription()'
         #                    ''.format(switch.ip), 2)
-        # switch.CollectInterfaceDescriptions()
-        # metrics.DebugPrint('[{0}].CollectCDPInformation()'
+        # switch._collect_interface_descriptions()
+        # metrics.DebugPrint('[{0}]._collect_cdp_information()'
         #                    ''.format(switch.ip), 2)
-        # switch.CollectCDPInformation()
+        # switch._collect_cdp_information()
 
         tmp = prepCommands(switch, edge)
         oBuffer += switch.ip + '\n'
@@ -173,7 +173,7 @@ def main(argv):
 
 def prepCommands(switch, edge):
     '''
-        Given clSwitch, iterate through clSwitchPort objects
+        Given Switch, iterate through SwitchPort objects
         prepare commands to apply descriptions
         only to ports that have no CDP switch neighbor and no manually applied
         description
@@ -205,7 +205,7 @@ def prepCommands(switch, edge):
 
 def PrepairDescripiton(switchport):
     '''
-        Given a clSwitchPort object, output an appropriate
+        Given a SwitchPort object, output an appropriate
         interface description
     '''
 
@@ -258,9 +258,9 @@ def PrepairDescripiton(switchport):
 
 def PrepairSwitches(hosts, creds, defaultgateway):
     '''
-        Given host,creds,defaultgateway, call switchuserinfo.ProcessEndDevices
-        use 'switch' strings in each clEndDevice to populate list of switches,
-        properly link clSwitch and clEndDevice ojbects
+        Given host,creds,defaultgateway, call switchuserinfo.process_end_devices
+        use 'switch' strings in each EndDevice to populate list of switches,
+        properly link Switch and EndDevice ojbects
         create device.switchport.  device.switchport property handles linking
         return list of switches
     '''
@@ -268,7 +268,7 @@ def PrepairSwitches(hosts, creds, defaultgateway):
     switches = []
 
     for host in hosts:
-        sw = clSwitch(ip=host, creds=creds)
+        sw = Switch(ip=host, creds=creds)
         switches.append(sw)
 
     if MULTITHREADING:
@@ -287,7 +287,7 @@ def PrepairSwitches(hosts, creds, defaultgateway):
                        'len(ScrubbedSwitches): '
                        '{0}'.format(len(ScrubbedSwitches)), 2)
 
-    endDevices = sshutil.ProcessEndDevices(switches=ScrubbedSwitches,
+    endDevices = sshutil.process_end_devices(switches=ScrubbedSwitches,
                                            creds=creds,
                                            defaultgateway=defaultgateway,
                                            maxThreads=MAX_THREADS)
@@ -321,7 +321,7 @@ def PopulateSwitchesST(switches):
 
 def PopulateSwitch(switch):
     metrics.DebugPrint('Populating Switch: {0}'.format(switch.ip), 2)
-    switch.Populate()
+    switch.populate()
     return switch
 
 
