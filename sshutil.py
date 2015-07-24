@@ -19,6 +19,7 @@ from sshexecute import sshrunP
 import sshexecute
 from metrics import DebugPrint
 import metrics
+from collections import namedtuple
 
 
 # TODO:  FIX THIS MESS
@@ -148,7 +149,7 @@ def Date():
     return rslt
 
 
-class clEndDevice(object):
+class EndDevice(object):
     """Represent an end device"""
     def __init__(self, mac=None, ip=None, switchport=None, switch=None,
                  dns=None):
@@ -171,12 +172,12 @@ class clEndDevice(object):
         return self._switchport
 
     @switchport.setter
-    def switchport(self, port):  # could be clSwitchPort or str
-        if not isinstance(self.switch, clSwitch):
+    def switchport(self, port):  # could be SwitchPort or str
+        if not isinstance(self.switch, Switch):
             self._switchport = format_interface_name(str(port))
             # if switch is str, this must also be str
             return
-            # raise Exception('can\'t set \'clEndDevice({0}).switchport({1})\'
+            # raise Exception('can\'t set \'EndDevice({0}).switchport({1})\'
             # before .switch has a real object '.format(self,port))
         if type(port) == str:
             port = format_interface_name(port)
@@ -185,7 +186,7 @@ class clEndDevice(object):
         # could already be created and in place
         if port not in self.switch.ports:
             if type(port) == str:
-                self.switch.ports += [clSwitchPort(name=port)]
+                self.switch.ports += [SwitchPort(name=port)]
             else:
                 self.switch.ports += port
         index = self.switch.ports.index(port)
@@ -201,12 +202,12 @@ class clEndDevice(object):
 
     @switch.setter
     def switch(self, switch):
-        # needs to be an actual clSwitch or None or String
+        # needs to be an actual Switch or None or String
         if type(switch) == str:
             self._switch = switch
             return
             # raise Exception('Need to pass an actual switch object to
-            # clEndDevice.switch')
+            # EndDevice.switch')
         self._switch = switch
         if self._switch is None:
             return
@@ -243,7 +244,7 @@ class clEndDevice(object):
         return NotImplemented
 
 
-class clNetworkDevice(object):
+class NetworkDevice(object):
     def __init__(self, ip='None', creds=None):  # str ip
         self._ip = 'None'
         self.ip = ip
@@ -265,42 +266,161 @@ class clNetworkDevice(object):
         if type(arg) in [str, type(None)]:
             self._ip = str(arg)
         else:
-            raise Exception('can\'t set \'clSwitch({0}).ip\' to {1}'
+            raise Exception('can\'t set \'Switch({0}).ip\' to {1}'
                             ''.format(self, type(arg)))
 
-    def _Connect(self):
+    def _connect(self):
         if self.connection is None:
-            self.connection = sshexecute.clSSHConnection(self.ip,
+            self.connection = sshexecute.SSHConnection(self.ip,
                                                          self.credentials,
                                                          True)
 
-    def Execute(self, command, trim=True, timeout=1.5):
+    def execute(self, command, trim=True, timeout=1.5):
         """
         Connect to switch and execute 'command'
         """
-        self._Connect()
-        UpdateMetric('Switch.Execute')
+        self._connect()
+        UpdateMetric('Switch.execute')
         lines = self.connection.run(command=command,
                                     trim=trim,
                                     timeout=timeout)
         return lines
 
 
-class clRiverbed(clNetworkDevice):
+class Riverbed(NetworkDevice):
     pass
 
 
-class clSwitch(clNetworkDevice):
+class Switch(NetworkDevice):
     """
         represent a switch, contains clSwitchPorts and references
         to their clEndDevices
     """
     def __init__(self, ip='None', creds=None):  # str ip
-        clNetworkDevice.__init__(self, ip, creds)
+        NetworkDevice.__init__(self, ip, creds)
         self.ports = []
         self.devices = []
         self.CDPinformation = {}
         self._MACAddressTable = ''
+
+    @property
+    def hostname(self):
+        """
+        Cisco Specific
+        :return:
+        """
+        for line in self.startup_config.splitlines():
+            if 'hostname' in line:
+                return line.split()[-1]
+        return ''
+
+    @property
+    def supervisor(self):
+        """
+        Cisco Specific
+        :return:
+        """
+        for line in self.execute('show module').splitlines():
+            if 'supervisor' in line.lower():
+                return line.split()[-2]
+        return ''
+
+    @property
+    def flash(self):
+        """
+        Cisco Specific
+        :return:
+        """
+        FreeSpace = namedtuple('FreeSpace', 'free, total')
+        filesystems = ['bootdisk:', 'flash:', 'bootflash:',
+                       'sup-bootflash:', 'slot0:']
+        for filesystem in reversed(filesystems):
+            rslt = self.execute('dir {0}'.format(filesystem))
+            if 'Invalid input' not in rslt and 'Error' not in rslt:
+                line = rslt.splitlines()[-1]
+                #fs = FreeSpace(line.split()[-3].strip('('),
+                #               line.split()[0])
+                #return fs
+                return filesystem, line, self.execute('dir').splitlines()[-1]
+
+
+
+
+    @property
+    def available_ram(self):
+        """
+        Cisco Specific
+        :return:
+        """
+
+        regex = re.compile(r'[^K/0-9.]').search
+        search = lambda x: 'K' in x and not bool(regex(x))
+        # looking for '#####K' or '#####K/#####K' etc.
+        for line in self.version:
+            if 'bytes of memory' in line:
+                for word in line:
+                    if search(word):
+                        break
+                break
+        else:
+            return ''
+        word = word.split('/')
+        add = lambda x, y: x + int(y.strip('K'))
+        rslt = str(reduce(add, word, 0))
+        if rslt[-1] is not 'K':
+            rslt += 'K'
+        return rslt
+
+    @property
+    def model(self):
+        for line in self.version.splitlines():
+            if 'bytes of' in line.lower():
+                return line.split()[1]
+        return 'UNK'
+
+    @property
+    def version(self):
+        """
+        Cisco Specific
+        :return:
+        """
+        try:
+            return self._version
+        except AttributeError:
+            self._collect_version()
+            return self._version
+
+    @property
+    def startup_config(self):
+        """
+        Cisco Specific
+        :return:
+        """
+        try:
+            return self._startup_config
+        except AttributeError:
+            self._collect_startup_config()
+            return self._startup_config
+
+    def _collect_startup_config(self):
+        """
+        Cisco Specific
+        :return:
+        """
+        self._startup_config = self.execute('show startup-config')
+
+    def _collect_version(self, data=False):
+        """
+           Pull Version info
+        """
+        command = 'sh ver'
+        UpdateMetric('Switch._collect_version')
+        try:
+            rBuffer = self.execute(command)
+        except:
+            raise
+
+        self._version = rBuffer
 
     @property
     def ports(self):
@@ -312,14 +432,14 @@ class clSwitch(clNetworkDevice):
             self._ports = arg
             i = 0
             while i < len(arg):
-                if type(arg[i]) == str:
-                    self.ports[i] = clSwitchPort(name=self.ports[i],
+                if isinstance(arg[i], basestring):
+                    self.ports[i] = SwitchPort(name=self.ports[i],
                                                  switch=self)
                 elif (self.ports[i].switch != self):
                     self.ports[i].switch = self
                 i += 1
         else:
-            raise Exception('can\'t set \'clSwitch({0}).ports\''
+            raise Exception('can\'t set \'Switch({0}).ports\''
                             'with {1}'.format(self, type(arg)))
 
     @property
@@ -331,16 +451,16 @@ class clSwitch(clNetworkDevice):
         if type(arg) == list:
             self._devices = arg
         else:
-            raise Exception('can\'t set \'clSwitch({0}).devices\' with {1}'
+            raise Exception('can\'t set \'Switch({0}).devices\' with {1}'
                             ''.format(self, type(arg)))
 
-    def Populate(self):
+    def populate(self):
         """
         Run all of this switches 'collect' methods.  Typically faster
         than running them one by one at different times because you never
         have to rebuild the connection, etc...
         """
-        metrics.DebugPrint('[{0}].Populate()'.format(self.ip))
+        metrics.DebugPrint('[{0}].populate()'.format(self.ip))
 
         # need an IP and creds to start.
         if self.ip == 'None' or not self.credentials:
@@ -348,55 +468,60 @@ class clSwitch(clNetworkDevice):
                                'and/or creds', 3)
             raise Exception('missing IP or creds')
 
-        metrics.DebugPrint('[{0}]..GetInterfaces()'.format(self.ip))
-        self.GetInterfaces()
+        metrics.DebugPrint('[{0}].._get_interfaces()'.format(self.ip))
+        self._get_interfaces()
         if self.state not in self.goodstates:
-            metrics.DebugPrint('[{0}].Populate failed!  State: {1}'
+            metrics.DebugPrint('[{0}].populate failed!  State: {1}'
                                ''.format(self.ip, self.state))
             return self.state
 
-        metrics.DebugPrint('[{0}]..ClassifyPorts()'.format(self.ip))
-        self.ClassifyPorts()
+        metrics.DebugPrint('[{0}].._classify_ports()'.format(self.ip))
+        self._classify_ports()
 
-        metrics.DebugPrint('[{0}]..CollectCDPInformation()'.format(self.ip))
-        self.CollectCDPInformation()
+        metrics.DebugPrint('[{0}].._collect_cdp_information()'.format(self.ip))
+        self._collect_cdp_information()
 
-        metrics.DebugPrint('[{0}]..CollectMACAddressTable()'.format(self.ip))
-        self.CollectMACAddressTable()
+        metrics.DebugPrint('[{0}]..collect_mac_table()'.format(self.ip))
+        self.collect_mac_table()
 
-        metrics.DebugPrint('[{0}]..CollectInterfaceDescriptions()'
+        metrics.DebugPrint('[{0}].._collect_interface_descriptions()'
                            ''.format(self.ip))
-        self.CollectInterfaceDescriptions()
-        self.CollectVersion()
+        self._collect_interface_descriptions()
+        self._collect_version()
 
         return self.state
 
-    def CollectMACAddressTable(self):
+    def populate_lite(self):
+        self._collect_startup_config()
+        self._collect_version()
+
+
+    def collect_mac_table(self):
         """
         Connect to switch and pull MAC Address table
         """
         command = 'sh mac address-table'
-        UpdateMetric('Switch.CollectMACAddressTable')
-        lines = self.Execute(command)
+        UpdateMetric('Switch.collect_mac_table')
+        lines = self.execute(command)
         self._MACAddressTable = '\n'.join(
             [x for x in lines.splitlines() if 'dynamic' in x.lower()])
 
     @property
-    def MACAddressTable(self):
+    def mac_table(self):
         if not self._MACAddressTable:
-            self.CollectMACAddressTable()
+            self.collect_mac_table()
         table = self._MACAddressTable
         return table
 
-    def GetInterfaces(self, data=False):
+    def _get_interfaces(self, data=False):
         """
         Return all interfaces on a switch, including stats
         """
         command = 'show interface'
-        UpdateMetric('clSwitch.GetInterfaces')
+        UpdateMetric('Switch._get_interfaces')
         if not data:
             try:
-                lines = self.Execute(command).splitlines()
+                lines = self.execute(command).splitlines()
             except:
                 self.state = 'DOWN'
                 return []
@@ -412,7 +537,7 @@ class clSwitch(clNetworkDevice):
                 pass
             else:
                 if (not first and 'line protocol' in line):
-                    port = clSwitchPort(detail=('\n'.join(detail)),
+                    port = SwitchPort(detail=('\n'.join(detail)),
                                         switch=self)
                     self.ports.append(port)
                     detail = []
@@ -420,10 +545,10 @@ class clSwitch(clNetworkDevice):
                     first = False
             detail.append(line)
         # Don't forget the last one...
-        port = clSwitchPort(detail=('\n'.join(detail)), switch=self)
+        port = SwitchPort(detail=('\n'.join(detail)), switch=self)
         self.ports.append(port)
 
-    def CollectCDPInformation(self, data=False):
+    def _collect_cdp_information(self, data=False):
         """
            Apply CDP neighbor information to self.ports[]
            ex. switch.ports[1].CDPneigh[0] == (
@@ -433,9 +558,9 @@ class clSwitch(clNetworkDevice):
                NieghborPort)
         """
         command = 'sh cdp ne det'
-        UpdateMetric('clSwitch.CollectCDPInformation')
+        UpdateMetric('Switch._collect_cdp_information')
         try:
-            rBuffer = self.Execute(command)
+            rBuffer = self.execute(command)
         except:
             raise
 
@@ -469,29 +594,7 @@ class clSwitch(clNetworkDevice):
                 switchport.CDPneigh.append(CDPEntries[switchport.name.lower()])
         self.CDPinformation = CDPEntries
 
-    def CollectVersion(self, data=False):
-        """
-           Pull Version info
-        """
-        command = 'sh ver'
-        UpdateMetric('clSwitch.CollectVersion')
-        try:
-            rBuffer = self.Execute(command)
-        except:
-            raise
-
-        spLines = rBuffer.splitlines()
-        lines = [line for line in spLines if 'WS' in line]
-        if len(lines) < 1:
-            self.model = 'UNK'
-        else:
-            line = lines[0]
-            for word in line.split():
-                if 'WS' in word:
-                    self.model = word
-                    break
-
-    def ClassifyPorts(self, data=False):
+    def _classify_ports(self, data=False):
         """
             Classify ports by switchport mode.
             ('access', 'trunk')
@@ -500,19 +603,19 @@ class clSwitch(clNetworkDevice):
         switchport = ''
         mode = ''
         command = 'sh int switchport'
-        UpdateMetric('clSwitch.ClassifyPorts')
+        UpdateMetric('Switch._classify_ports')
         if data:
             rBuffer = data.strip()
         else:
             if self.state not in self.goodstates:
                 return
             try:
-                rBuffer = self.Execute(command)
+                rBuffer = self.execute(command)
             except:
                 raise
 
         spLines = rBuffer.splitlines()
-        DebugPrint('clSwitch.ports: {0}'.format(self.ports))
+        DebugPrint('Switch.ports: {0}'.format(self.ports))
         for line in spLines:
             if 'Name:' in line:
                 name = format_interface_name(line.split()[-1])
@@ -534,19 +637,19 @@ class clSwitch(clNetworkDevice):
                 port.switchportMode = mode
                 port.switchport = switchport
 
-    def CollectInterfaceDescriptions(self, data=False):
+    def _collect_interface_descriptions(self, data=False):
         """
             Apply existing interface descriptions to
             switch.ports[] ex. switch.ports[1].description = 'Trunk to
             ABQCore1'
         """
         command = 'sh int description'
-        UpdateMetric('CollectInterfaceDescriptions')
+        UpdateMetric('_collect_interface_descriptions')
         if not (self.state in self.goodstates):
             return
 
         try:
-            rBuffer = self.Execute(command)
+            rBuffer = self.execute(command)
         except:
             raise
         spLines = rBuffer.splitlines()[1:]
@@ -555,12 +658,12 @@ class clSwitch(clNetworkDevice):
             try:
                 line = next(x for x in spLines if name in x)
             except StopIteration:
-                print 'Unexpected StopIteration!'
-                print 'switch =', self.ip
-                print 'Port = ', name
-                print 'Data:'
-                print spLines
-                raise Exception('It Broke')
+                #print 'Unexpected StopIteration!'
+                #print 'switch =', self.ip
+                #print 'Port = ', name
+                #print 'Data:'
+                #print spLines
+                raise Exception('Failure in _collect_interface_descriptions')
 
             spLine = re.split('\s\s+', line)
             if len(spLine) >= 4:
@@ -569,7 +672,7 @@ class clSwitch(clNetworkDevice):
                 description = ''
             switchport.description = description
 
-    def GetEndDevices(self):
+    def _get_end_devices(self):
         rslt = []
         scrubbedInterfaceList = []
         scrubbedMACAddressTable = []
@@ -580,15 +683,15 @@ class clSwitch(clNetworkDevice):
                                                                port.edge))
             if port.edge:
                 scrubbedInterfaceList.append(port)
-        DebugPrint('[{0}].GetEndDevices.len(scrubbedInterfaceList): {1}'
+        DebugPrint('[{0}]._get_end_devices.len(scrubbedInterfaceList): {1}'
                    ''.format(self.ip, len(scrubbedInterfaceList)), 1)
-        DebugPrint('[{0}].GetEndDevices.scrubbedInterfaceList: {1}'
+        DebugPrint('[{0}]._get_end_devices.scrubbedInterfaceList: {1}'
                    ''.format(self.ip, scrubbedInterfaceList), 0)
 
-        macAddressTable = self.MACAddressTable
-        DebugPrint('[{0}].GetEndDevices.len(macAddressTable): {1}'
+        macAddressTable = self.mac_table
+        DebugPrint('[{0}]._get_end_devices.len(macAddressTable): {1}'
                    ''.format(self.ip, len(macAddressTable.splitlines())), 1)
-        DebugPrint('[{0}].GetEndDevices.macAddressTable: {1}'
+        DebugPrint('[{0}]._get_end_devices.macAddressTable: {1}'
                    ''.format(self.ip, macAddressTable), 0)
 
         for interface in scrubbedInterfaceList:
@@ -600,12 +703,12 @@ class clSwitch(clNetworkDevice):
         for line in scrubbedMACAddressTable:
             mac = format_mac_address(line.split()[1])
             port = line.split()[-1]
-            ed = clEndDevice()
+            ed = EndDevice()
             ed.mac = mac
             ed.switch = self
             ed.switchport = port
             rslt.append(ed)
-        rslt = deduplicate_list(rslt, 'returning from GetEndDevices')
+        rslt = deduplicate_list(rslt, 'returning from _get_end_devices')
         return rslt
 
     def __repr__(self):
@@ -622,16 +725,16 @@ class clSwitch(clNetworkDevice):
         return not (self == other)
 
 
-class clSwitchPort(object):
+class SwitchPort(object):
     """
-        Represent ports attached to a clSwitch.  Contains
-        clEndDevice objects and reference to its parent
-        clSwitch.
+        Represent ports attached to a Switch.  Contains
+        EndDevice objects and reference to its parent
+        Switch.
     """
 
     def __init__(self, name=None, switch=None, switchportMode=None,
                  detail=None):
-        # str ip, clSwitch switch
+        # str ip, Switch switch
         self.stats = {}
         self.switchportMode = switchportMode
         self.CDPneigh = []
@@ -657,7 +760,7 @@ class clSwitchPort(object):
         if type(arg) == list or arg is None:
             self._CDPneigh = arg
         else:
-            raise Exception('can\'t set \'clSwitchPort({0}).CDPneigh\' with '
+            raise Exception('can\'t set \'SwitchPort({0}).CDPneigh\' with '
                             '{1}'.format(self, type(arg)))
 
     @property
@@ -671,13 +774,13 @@ class clSwitchPort(object):
             i = 0
             while i < len(arg):
                 if type(self.devices[i]) == str:
-                    self.devices[i] = clEndDevice(mac=self.devices[i],
+                    self.devices[i] = EndDevice(mac=self.devices[i],
                                                   switch=self)
                 elif (self.devices[i].swtich != self):
                     self.devices[i].switch = self
                 i += 1
         else:
-            raise Exception('can\'t set \'clSwitchPort({0}).devices\' with '
+            raise Exception('can\'t set \'SwitchPort({0}).devices\' with '
                             '{1}'.format(self, type(arg)))
 
     @property
@@ -716,7 +819,7 @@ class clSwitchPort(object):
     def detail(self, value):
         UpdateMetric('SwitchportSetDetail')
         if type(value) is not str and not (len(value) > 0):
-            raise Exception('can\'t set \'clSwitchPort({0}).detail with '
+            raise Exception('can\'t set \'SwitchPort({0}).detail with '
                             '{1}'.format(self, type(value)))
 
         self._detail = value
@@ -750,7 +853,7 @@ class clSwitchPort(object):
                 elif 'Description:' in line:
                     self.description = ' '.join(lsplit[1:])
         except Exception as e:
-            print self._detail
+            #print self._detail
             raise e
 
     def _get_edge(self, CDPneigh=[], switchportMode='access'):
@@ -791,12 +894,12 @@ class clSwitchPort(object):
         return not (self == other)
 
 
-def ProcessEndDevices(switches, creds=None, defaultgateway=None, maxThreads=1):
+def process_end_devices(switches, creds=None, defaultgateway=None, maxThreads=1):
     """
-        call GetEndDevices for given host(s), resolve IPs and DNS information
+        call _get_end_devices for given host(s), resolve IPs and DNS information
         return list
     """
-    metrics.DebugPrint('sshutil.py:ProcessEndDevices()', 2)
+    metrics.DebugPrint('sshutil.py:process_end_devices()', 2)
     metrics.DebugPrint('::hosts:{0}\n::defaultgateway:{1}\n::maxThreads:{2}'
                        ''.format(switches, defaultgateway, maxThreads), 1)
     global CREDENTIALS
@@ -820,12 +923,12 @@ def ProcessEndDevices(switches, creds=None, defaultgateway=None, maxThreads=1):
     for switch in switches:
         DebugPrint('Collecting End Devices from: {0}'
                    ''.format(str(switch)), 2)
-        endDevices += switch.GetEndDevices()
-        DebugPrint('ProcessEndDevices.{0}.endDevices: {1}'
+        endDevices += switch._get_end_devices()
+        DebugPrint('process_end_devices.{0}.endDevices: {1}'
                    ''.format(str(switch), str(endDevices)), 0)
 
     if (endDevices is None) or len(endDevices) == 0:
-        DebugPrint('ProcessEndDevices.NoEndDevicesFound!', 3)
+        DebugPrint('process_end_devices.NoEndDevicesFound!', 3)
         return []
 
     if defaultgateway is None:
@@ -834,14 +937,14 @@ def ProcessEndDevices(switches, creds=None, defaultgateway=None, maxThreads=1):
 
     DebugPrint('Resolving MAC addresses', 2)
     for endDevice in endDevices:
-        endDevice.ip = ResolveMAC(endDevice.mac)
+        endDevice.ip = resolve_mac(endDevice.mac)
 
     DebugPrint('Resolving DNS names', 2)
-    ResolveIPsMT(endDevices, maxThreads)
+    resolve_ips_mt(endDevices, maxThreads)
     return endDevices
 
 
-def ResolveIP(ip):
+def resolve_ip(ip):
     """
         Given an IP address, return appropriate DNS entry, if any
     """
@@ -853,91 +956,33 @@ def ResolveIP(ip):
     return dns
 
 
-def ResolveIPsMT(endDevices, maxThreads=4):
+def resolve_ips_mt(endDevices, maxThreads=4):
 
     """
         Given list of clEndDevices, use pool of subprocesses
-        (count determined by MAX_THREADS) to call ResolveIP()
+        (count determined by MAX_THREADS) to call resolve_ip()
     """
     ips = []
     dns = []
-    DebugPrint('ResolveIPsMT.maxThreads: ' + str(maxThreads))
-    DebugPrint('ResolveIPsMT.endDevices: ' + str(endDevices), 0)
+    DebugPrint('resolve_ips_mt.maxThreads: ' + str(maxThreads))
+    DebugPrint('resolve_ips_mt.endDevices: ' + str(endDevices), 0)
     for ed in endDevices:
         ips.append(ed.ip)
-    DebugPrint('ResolveIPsMT.IPs: ' + str(ips), 0)
+    DebugPrint('resolve_ips_mt.IPs: ' + str(ips), 0)
     pool_size = maxThreads
     pool = multiprocessing.Pool(processes=pool_size)
-    dns = pool.map(ResolveIP, ips)
+    dns = pool.map(resolve_ip, ips)
     pool.close()
     pool.join()
     for n in range(len(ips)):
         if ips[n] == endDevices[n].ip:  # sanity check
             endDevices[n].dns = dns[n]
         else:
-            DebugPrint('Sanity Check failed during ResolveIPsMT()', 3)
+            DebugPrint('Sanity Check failed during resolve_ips_mt()', 3)
             pass
 
 
-def GetMACAddressTable(host=None, interface=None):
-    """
-        Returns either the entire MAC address table, or entries
-        for an individual interface, depending upon input
-    """
-    if host is None:
-        if CURRENT_SWITCH is None:
-            raise Exception('CURRENT_SWITCH not set!')
-        else:
-            host = CURRENT_SWITCH
-
-    command = 'sh mac address-table'
-    if interface is not None:
-        command += ' int {0}'.format(interface)
-    # command += ' | inc dynamic'
-
-    UpdateMetric('GetMacAddressTable')
-    try:
-        lines = sshrunP(command=command, host=host, creds=CREDENTIALS)
-    except:
-        return []
-    return '\n'.join([x for x in lines.splitlines() if 'dynamic' in x.lower()])
-
-
-def ClassifyPorts(host=None):
-    """
-        Given host, return list of ports that are:
-        UP, UP, and switchport mode access
-    """
-    if host is None:
-        if CURRENT_SWITCH is None:
-            raise Exception('CURRENT_SWITCH not set!')
-        else:
-            host = CURRENT_SWITCH
-
-    name = ''
-    switchport = ''
-    mode = ''
-    ports = []
-    command = 'sh int switchport'
-    UpdateMetric('ClassifyPort')
-    try:
-        rBuffer = sshrunP(command=command, host=host, creds=CREDENTIALS)
-    except:
-        raise
-    spLines = rBuffer.splitlines()
-    for line in spLines:
-        if 'Name:' in line:
-            name = line.split()[-1]
-        elif 'Switchport:' in line:
-            switchport = line.split()[-1]
-        elif 'Operational Mode:' in line:
-            mode = line.split()[-1]
-            if switchport == 'Enabled' and mode == 'access':
-                ports.append(format_interface_name(name))
-    return ports
-
-
-def ResolveMAC(mac=None, defaultgateway=None, ip=None, creds=None):
+def resolve_mac(mac=None, defaultgateway=None, ip=None, creds=None):
     """
         Given a MAC or IP address and the appropriate subnet default gateway,
         SSH into the default gateway and use arp table to resolve between MAC
@@ -954,10 +999,10 @@ def ResolveMAC(mac=None, defaultgateway=None, ip=None, creds=None):
         creds = CREDENTIALS
     if not (mac or ip):
         raise Exception('No MAC or IP Address specified to resolve!')
-    # DebugPrint('ResolveMAC.defaultgateway: ' + str(defaultgateway))
-    # DebugPrint('ResolveMAC.creds[0]: ' + creds[0])
+    # DebugPrint('resolve_mac.defaultgateway: ' + str(defaultgateway))
+    # DebugPrint('resolve_mac.creds[0]: ' + creds[0])
     if ARP_TABLE == []:
-        UpdateMetric('ResolveMAC')
+        UpdateMetric('resolve_mac')
         try:
             ARP_TABLE = sshrunP(command=command, host=defaultgateway,
                                 creds=creds)

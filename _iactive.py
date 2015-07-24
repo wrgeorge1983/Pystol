@@ -14,6 +14,7 @@ import json
 from pprint import pprint  # Not used here, but we want it in interactive mode.
 import time
 from subprocess import Popen
+from collections import defaultdict
 
 sys.path += [os.getcwd()]
 
@@ -23,7 +24,7 @@ import sshutil
 # Imports from third party modules
 import phpipam
 import ipaddress
-
+import openpyxl
 
 DEFAULT_SW_IP = '10.10.10.10'
 DEFAULT_HOST_IP = '10.10.10.10'
@@ -241,9 +242,9 @@ class IPAM(phpipam.PHPIPAM):
         return rslt
 
 
-# Wrapps clSwitch() with features that are great for interactive access,
+# Wrapps Switch() with features that are great for interactive access,
 # but would be terrible to use in an normal script.
-class clintSwitch(sshutil.clSwitch):
+class clintSwitch(sshutil.Switch):
     def __init__(self, ip=None, creds=None, timeout=None):
         if timeout:
             self.timeout = timeout
@@ -269,7 +270,7 @@ class clintSwitch(sshutil.clSwitch):
                 clintSwitch.site = ip
         else:
             ip = 'None'
-        sshutil.clSwitch.__init__(self, ip, creds)
+        sshutil.Switch.__init__(self, ip, creds)
 
     def pexecute(self, cmd, trim=True, timeout=None):
         args = [cmd, trim]
@@ -279,7 +280,7 @@ class clintSwitch(sshutil.clSwitch):
         if timeout:
             args.append(timeout)
 
-        print self.Execute(*args)
+        print self.execute(*args)
 
     def interact(self):
         cmd = 'ssh {0}'.format(self.ip)
@@ -309,7 +310,7 @@ def pythonrc():
 def retrieve_pcaps(sw):
     destcreds = sshutil.get_credentials()
     host = DEFAULT_HOST_IP
-    lines = sw.Execute('sh flash: | i pcap').splitlines()
+    lines = sw.execute('sh flash: | i pcap').splitlines()
     files = [line.split()[-1] for line in lines]
     for fil in files:
         command = 'copy {0} scp:'.format(fil)
@@ -320,3 +321,81 @@ def retrieve_pcaps(sw):
         sw.pexecute('\n')
         sw.pexecute('\n')
         sw.pexecute(destcreds[1], 5)
+
+class WorkbookWrapper(object):
+    def __init__(self, filename):
+
+        self.column_from_string = lambda x: openpyxl.utils.column_index_from_string(x) - 1
+
+        self.wb = self.load_workbook(filename)
+        self.ws = self.wb.active
+        self.rows = self.ws.rows
+        self.columns = self.ws.columns
+        self.cell = self.ws.cell
+
+        self.build_header()
+        self.attribute_mapping = defaultdict(None)
+        self.attribute_mapping.update(
+            {
+                'hostname':'hostname',
+                'supervisor':'supervisor',
+                'ram (k)':'installed_ram'
+            }
+        )
+
+    def build_header(self):
+        """
+        Assume header is row A
+        :return:
+        """
+        header_row = self.rows[0]
+        header = [(cell.value.lower(), index) for index, cell in enumerate(header_row)
+                  if cell.value is not None]
+        self.header = defaultdict(str)
+        for (name, index) in header:
+            self.header[name] = index
+            self.header[index] = name
+
+    def validate_hostname(self, switch, value):
+        if switch.hostname == value:
+            return True, switch.hostname
+        else:
+            return False, switch.hostname
+
+    def validate_supervisor(self, switch, value):
+        sup = switch.supervisor
+        return sup == value, sup
+
+    @staticmethod
+    def validate_switch_attribute(switch, attribute, value):
+        ref = getattr(switch, attribute)
+        return ref == value, ref
+
+    @staticmethod
+    def load_workbook(filename):
+        """
+        return an xlsx document
+        :param filename: filename of xlsx doc.  Assume it's under ~/stage/
+        :return:
+        """
+
+        path = os.path.join('~', 'stage', filename)
+        path = os.path.expanduser(path)
+        wb = openpyxl.load_workbook(path)
+        return wb
+
+    def switch_from_row(self, row_index):
+        row = self.rows[row_index]
+
+        attrib_from_cell = lambda x: self.header[self.column_from_string(x.column)]
+        attrs = dict((attrib_from_cell(cell), cell.value) for cell in row
+                          if cell.value is not None)
+
+        switch = clintSwitch(ip=attrs['ip address'])
+        switch.row_index = row_index
+        return switch
+
+    def get_attribs(self, switch):
+        pass
+
+
