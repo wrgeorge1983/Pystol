@@ -16,6 +16,7 @@ import time
 from subprocess import Popen
 from collections import defaultdict
 import multiprocessing.pool
+import collections
 
 sys.path += [os.getcwd()]
 
@@ -273,6 +274,14 @@ class clintSwitch(sshutil.Switch):
             ip = 'None'
         sshutil.Switch.__init__(self, ip, creds)
 
+    @property
+    def flash_total(self):
+        return '{0}K'.format(self.flash.total)
+
+    @property
+    def flash_free(self):
+        return '{0}K'.format(self.flash.free)
+
     def pexecute(self, cmd, trim=True, timeout=None):
         args = [cmd, trim]
         if not timeout:
@@ -288,10 +297,7 @@ class clintSwitch(sshutil.Switch):
         Popen(cmd, shell=True).communicate()
 
     def bufferflush(self):
-        rslt = ''
-        while self.connection.channel.recv_ready():
-            rslt += self.connection.channel.recv(1000)
-        return rslt
+        return self.connection.buffer_flush()
 
 
 def poll_switch(sw, cmd, sleep_time):
@@ -335,12 +341,16 @@ class WorkbookWrapper(object):
         self.cell = self.ws.cell
 
         self.build_header()
-        self.attribute_mapping = defaultdict(None)
-        self.attribute_mapping.update(
+        self.attribute_mapping = defaultdict(lambda: None)
+
+        self.attribute_mapping.update(  # maps header fields to object attributes
             {
-                'hostname':'hostname',
-                'supervisor':'supervisor',
-                'ram (k)':'installed_ram'
+                'hostname': 'hostname',
+                'ip address': 'ip',
+                'supervisor': 'supervisor',
+                'ram (k)': 'installed_ram',
+                'total flash': 'flash_total',
+                'free flash': 'flash_free',
             }
         )
 
@@ -357,20 +367,35 @@ class WorkbookWrapper(object):
             self.header[name] = index
             self.header[index] = name
 
-    def validate_hostname(self, switch, value):
-        if switch.hostname == value:
-            return True, switch.hostname
-        else:
-            return False, switch.hostname
+    def output_values(self, switches):
+        """
+        Takes switches (for now: manually provided, pre-populated) and outputs their attributes to xlsx.
 
-    def validate_supervisor(self, switch, value):
-        sup = switch.supervisor
-        return sup == value, sup
+        :param switches:
+        :return:
+        """
+        am = self.attribute_mapping
+        header = self.header
 
-    @staticmethod
-    def validate_switch_attribute(switch, attribute, value):
-        ref = getattr(switch, attribute)
-        return ref == value, ref
+        for row, switch in zip(self.rows[1:], switches):  # skip header row obviously
+            for index, cell in enumerate(row):
+                rslt = cell.value, getattr(switch, str(am[header[index]]), 'UNK')
+
+
+    # def validate_hostname(self, switch, value):
+    #     if switch.hostname == value:
+    #         return True, switch.hostname
+    #     else:
+    #         return False, switch.hostname
+    #
+    # def validate_supervisor(self, switch, value):
+    #     sup = switch.supervisor
+    #     return sup == value, sup
+    #
+    # @staticmethod
+    # def validate_switch_attribute(switch, attribute, value):
+    #     ref = getattr(switch, attribute)
+    #     return ref == value, ref
 
     @staticmethod
     def load_workbook(filename):
@@ -401,12 +426,13 @@ class WorkbookWrapper(object):
         return switch
 
     def switches_from_rows(self):
-        return [self.switch_from_row(row=row) for row in self.rows]
+        return [self.switch_from_row(row=row) for row in self.rows[1:]]  # skip header!
 
     def get_attribs(self, switch):
         pass
 
 
+# TODO: These are here only for testing purposes and should be pruned / factored out
 def populate_switch(switch):
     try:
         switch.populate_lite()
@@ -424,8 +450,11 @@ def test_wb_switches():
     start_time = time.time()
     rslts = pool.map_async(populate_switch, switches)
     increment_table = {100: 5, 50: 3, 25: 1, 10: 0.5}
+    remaining_q = []
+    increment = 5
     while True:
-        remaining = len([switch for switch in switches if switch.state =='UNK'])
+        remaining_switches = [switch.ip for switch in switches if switch.state == 'UNK']
+        remaining = len(remaining_switches)
         if remaining == 0:
             return
         seconds = time.time() - start_time
@@ -435,6 +464,19 @@ def test_wb_switches():
                 increment = increment_table[key]
             else:
                 break
+
+        if remaining in remaining_q:  # at least one nonproductive cycle
+            if len(remaining_q) == 4:
+                print('Remaining switches:')
+                pprint(remaining_switches)
+        else:
+            remaining_q = []
+
+        remaining_q.append(remaining)
+
         time.sleep(increment)
+
+    pool.close()
+    pool.join()
 
 

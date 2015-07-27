@@ -35,10 +35,19 @@ class SSHConnection(object):
     require answering prompts from the remote host, e.g. cisco: `copy file scp:`
     '''
 
-    def __init__(self, ip, credentials, interactive=False):
+    def __init__(self, ip, credentials, interactive=False, autoflush=True):
+        """
+
+        :param ip:
+        :param credentials:
+        :param interactive:
+        :param autoflush: automatically flush buffers before new interactive commands.
+        :return:
+        """
         self.ip = ip
         self.credentials = credentials
         self.interactive = interactive
+        self.autoflush = autoflush
         self.TextOnly = True
         self.session = None
         self.channel = None
@@ -49,11 +58,16 @@ class SSHConnection(object):
         self.stdOut = None
         self.stdErr = None
 
-    def run(self, command, timeout=None, trim=None):
+    def run(self, command, timeout=None, trim=None, flush=None):
         '''Run a command, interactive or not'''
-        
+
+        if flush is None:
+            flush = self.autoflush
+
         self._connect()
         if self.interactive:
+            if flush:
+                self.buffer_flush()
             return self._runP(command, timeout, trim)
         else:
             return self._run(command)
@@ -69,11 +83,8 @@ class SSHConnection(object):
             trim = self.trim
         if not command[-1] == '\n':
             command += '\n'
-        try:
-            chan.send(command)
-        except paramiko.channel.socket.error:
-            self._connect()
-            chan.send(command)
+
+        chan.send(command)
 
         n = 0
         # Max time to wait in any given stretch is timeout seconds
@@ -122,11 +133,12 @@ class SSHConnection(object):
     def _connect(self):
         '''Create and properly initialize session and channel as necessary'''
         
-        if not self.session or (self.interactive and
-                                (not self.channel or
-                                 not self.channel.transport.is_active() or
-                                 self.channel.closed)
-                                ):
+        if not self.session or \
+                (self.interactive and
+                    (not self.channel or
+                     not self.channel.transport.is_active() or
+                     self.channel.closed)
+                    ):
             self._NewSSH()
 
     def _NewSSH(self):
@@ -161,6 +173,11 @@ class SSHConnection(object):
         command = "terminal length 0\n"
         self.run(command)
 
+    def buffer_flush(self):
+        rslt = ''
+        while self.channel.recv_ready():
+            rslt += self.channel.recv(1000)
+        return rslt
 
 def NewSSH(host, creds, interactive=False):
     '''Initialize ssh connection object to specified host'''

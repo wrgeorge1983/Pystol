@@ -307,6 +307,7 @@ class Switch(NetworkDevice):
         self.devices = []
         self.cdp_information = {}
         self._mac_address_table = ''
+        self.populate_lite_time = None
 
     @property
     def hostname(self):
@@ -314,6 +315,9 @@ class Switch(NetworkDevice):
         Cisco Specific
         :return:
         """
+        if not self.supported:
+            return 'UNK'
+
         for line in self.startup_config.splitlines():
             if 'hostname' in line:
                 return line.split()[-1]
@@ -325,6 +329,9 @@ class Switch(NetworkDevice):
         Cisco Specific
         :return:
         """
+        if not self.supported:
+            return 'UNK'
+
         for line in self.execute('show module').splitlines():
             if 'supervisor' in line.lower():
                 return line.split()[-2]
@@ -336,20 +343,30 @@ class Switch(NetworkDevice):
         Cisco Specific
         :return:
         """
-        FreeSpace = namedtuple('FreeSpace', 'free, total')
-        filesystems = ['bootdisk:', 'flash:', 'bootflash:',
-                       'sup-bootflash:', 'slot0:']
-        for filesystem in reversed(filesystems):
-            rslt = self.execute('dir {0}'.format(filesystem))
-            if 'Invalid input' not in rslt and 'Error' not in rslt:
-                line = rslt.splitlines()[-1]
-                #fs = FreeSpace(line.split()[-3].strip('('),
-                #               line.split()[0])
-                #return fs
-                return filesystem, line, self.execute('dir').splitlines()[-1]
+        if not self.supported:
+            return 'UNK'
 
+        FlashSpace = namedtuple('FlashSpace', 'free, total')
+        # filesystems = ['bootdisk:', 'flash:', 'bootflash:',
+        #                'sup-bootflash:', 'slot0:']
 
+        rslt = self.execute('dir')
+        if any([word in rslt.lower() for word in ('invalid', 'error')]):
+            return 'UNK'
 
+        rslt = rslt.splitlines()[-1]
+        fs = FlashSpace(*reversed([int(sub.split()[0]) for sub in rslt.split('(')]))
+        # FlashSpace(free=xxxx, total=yyyy)
+        return fs
+
+        # for filesystem in reversed(filesystems):
+        #     rslt = self.execute('dir {0}'.format(filesystem))
+        #     if 'Invalid input' not in rslt and 'Error' not in rslt:
+        #         line = rslt.splitlines()[-1]
+        #         #fs = FreeSpace(line.split()[-3].strip('('),
+        #         #               line.split()[0])
+        #         #return fs
+        #         return filesystem, line, self.execute('dir').splitlines()[-1]
 
     @property
     def available_ram(self):
@@ -357,6 +374,8 @@ class Switch(NetworkDevice):
         Cisco Specific
         :return:
         """
+        if not self.supported:
+            return 'UNK'
 
         regex = re.compile(r'[^K/0-9.]').search
         search = lambda x: 'K' in x and not bool(regex(x))
@@ -378,10 +397,133 @@ class Switch(NetworkDevice):
 
     @property
     def model(self):
-        for line in self.version.splitlines():
-            if 'bytes of' in line.lower():
-                return line.split()[1]
+        """
+        Deduces this switches model number from 'sh ver' output.
+        This will fail gracefully to 'UNK', but 'Switch.supported' will return False in
+            this case and many features will refuse to run.
+        :return:
+        """
+        if self.state == 'UP':
+            for line in self.version.splitlines():
+                if 'bytes of' in line.lower():
+                    return line.split()[1]
         return 'UNK'
+
+    @property
+    def supported(self):
+        if self.model == 'UNK':
+            return False
+
+        return True
+
+    @property
+    def stacked(self):
+        """
+        whether or not the switch represents or is a member of a stack
+        :return: bool
+        """
+        if not self.supported:
+            return 'UNK'
+
+        version = self.version
+        stackable = False
+        stacklines = []
+        for index, line in enumerate(version.splitlines()):
+            if stackable:
+                if not line:
+                    break
+                elif '-' in line.split()[0]:
+                    continue
+                stacklines.append(line)
+                continue
+            if 'switch ports model' in line.lower():
+                stackable = True
+
+        if len(stacklines) > 1:
+            return True
+        return False
+
+    @property
+    def license(self):
+        if not self.supported:
+            return 'UNK'
+
+        try:
+            return self._license
+        except AttributeError:
+            self._collect_license()
+            return self._license
+
+    def _collect_license(self):
+
+        regex = re.compile(r'\(..*\),')
+
+        try:
+            word = regex.findall(self.version)[0]
+        except IndexError:
+            word = 'UNK'
+        else:
+            # sanity checks, if we're not sure, just suppress.
+            for char in ['(', ')', ',']:
+                if word.count(char) > 1:
+                    word = 'UNK'
+                    break
+            else:
+                word = word.split('-')[1]
+                if 'UNIVERSAL' in word.upper():
+                    rslt = self._read_universal_license()
+                    word = '{0} ({1})'.format(word, rslt)
+
+        self._license = word
+
+    def _read_universal_license(self):
+        """
+        Will return string in form: "(featureset, featureset)" if multiple valid
+        featuresets found.  Otherwise "featureset".
+        :return:
+        """
+        sh_license = self.execute('sh license')
+        index = 0
+        licenses = {}
+        rslts = []
+
+        if '% Incomplete' in sh_license:
+            license_options = self.execute('sh license ?')
+
+            if 'summary' in license_options:
+                sh_license = self.execute('sh license summary')
+            elif 'right-to-use' in license_options:
+                rtu = self.execute('sh license right-to-use')
+                for line in rtu.splitlines():
+                    if 'permanent' in line:
+                        return line.split()[1]
+                # return 'UNK'
+                raise Exception(rtu)
+
+        for line in sh_license.splitlines():
+            words = [word.strip() for word in line.split(':')]
+            if line.startswith('Index'):
+                index = words[0].split()[1]
+                feature = words[-1]
+                licenses[index] = {'feature': feature}
+                continue
+            licenses[index][words[0].lower()] = words[-1]
+
+        for license in licenses.values():
+            t_words = {'License State': 'active', 'License Type': 'permanent'}  # words to test for, all must hit
+
+            for key, value in t_words.items():
+                if value not in license.get(key.lower(), '').lower():
+                    break
+            else:
+                rslts.append(license['feature'])
+
+        if len(rslts) == 1:
+            return rslts[0]
+        elif len(rslts) > 1:
+            return str(rslts)
+        else:
+            return 'UNK'
 
     @property
     def version(self):
@@ -497,15 +639,17 @@ class Switch(NetworkDevice):
         return self.state
 
     def populate_lite(self):
+
         if self.ip == 'None' or not self.credentials:
             metrics.DebugPrint('Attempt to populate switch data missing IP'
                                'and/or creds', 3)
             raise Exception('missing IP or creds')
 
-
+        start_time = time.time()
         self._collect_startup_config()
         self._collect_version()
-
+        self._collect_license()
+        self.populate_lite_time = time.time() - start_time
 
     def collect_mac_table(self):
         """
