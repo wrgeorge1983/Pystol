@@ -276,11 +276,17 @@ class clintSwitch(sshutil.Switch):
 
     @property
     def flash_total(self):
-        return '{0}K'.format(self.flash.total)
+        try:
+            return '{0}K'.format(self.flash.total)
+        except:
+            return 'UNK'
 
     @property
     def flash_free(self):
-        return '{0}K'.format(self.flash.free)
+        try:
+            return '{0}K'.format(self.flash.free)
+        except:
+            return 'UNK'
 
     def pexecute(self, cmd, trim=True, timeout=None):
         args = [cmd, trim]
@@ -378,8 +384,14 @@ class WorkbookWrapper(object):
         header = self.header
 
         for row, switch in zip(self.rows[1:], switches):  # skip header row obviously
+            if switch.state.upper() != 'UP':
+                continue
             for index, cell in enumerate(row):
-                rslt = cell.value, getattr(switch, str(am[header[index]]), 'UNK')
+                try:
+                    rslt = cell.value, getattr(switch, str(am[header[index]]), 'UNK')
+                except:
+                    rslt = 'UNK'
+                cell.value = rslt
 
 
     # def validate_hostname(self, switch, value):
