@@ -332,10 +332,16 @@ class Switch(NetworkDevice):
         if not self.supported:
             return 'UNK'
 
+        _supervisor = getattr(self, '_supervisor', None)
+        if _supervisor is not None:
+            return _supervisor
+
+        _supervisor = ''
         for line in self.execute('show module').splitlines():
             if 'supervisor' in line.lower():
-                return line.split()[-2]
-        return ''
+                _supervisor = line.split()[-2]
+        self._supervisor = _supervisor
+        return self._supervisor
 
     @property
     def flash(self):
@@ -345,6 +351,9 @@ class Switch(NetworkDevice):
         """
         if not self.supported:
             return 'UNK'
+        _flash = getattr(self, '_flash', None)
+        if _flash is not None:
+            return _flash
 
         FlashSpace = namedtuple('FlashSpace', 'free, total')
         # filesystems = ['bootdisk:', 'flash:', 'bootflash:',
@@ -357,7 +366,8 @@ class Switch(NetworkDevice):
         rslt = rslt.splitlines()[-1]
         fs = FlashSpace(*reversed([int(sub.split()[0]) for sub in rslt.split('(')]))
         # FlashSpace(free=xxxx, total=yyyy)
-        return fs
+        self._flash = fs
+        return self._flash
 
         # for filesystem in reversed(filesystems):
         #     rslt = self.execute('dir {0}'.format(filesystem))
@@ -380,9 +390,10 @@ class Switch(NetworkDevice):
         regex = re.compile(r'[^K/0-9.]').search
         search = lambda x: 'K' in x and not bool(regex(x))
         # looking for '#####K' or '#####K/#####K' etc.
-        for line in self.version:
-            if 'bytes of memory' in line:
-                for word in line:
+        for line in self.version.splitlines():
+            if 'bytes of memory' in line or \
+                    'bytes of physical memory' in line:
+                for word in line.split():
                     if search(word):
                         break
                 break
@@ -390,9 +401,7 @@ class Switch(NetworkDevice):
             return ''
         word = word.split('/')
         add = lambda x, y: x + int(y.strip('K'))
-        rslt = str(reduce(add, word, 0))
-        if rslt[-1] is not 'K':
-            rslt += 'K'
+        rslt = reduce(add, word, 0)
         return rslt
 
     @property
@@ -526,6 +535,25 @@ class Switch(NetworkDevice):
             return 'UNK'
 
     @property
+    def software_version(self):
+        if not self.supported:
+            return 'UNK'
+
+        _sw_version = getattr(self, '_sw_version', None)
+        if _sw_version is not None:
+            return _sw_version
+
+        version = self.version
+        if 'IOS-XE' in version:
+            regex = re.compile(r'Version.*RELEASE')
+        else:
+            regex = re.compile(r'Version.*,')
+
+        _sw_version = regex.findall(self.version)[0].strip(',').split()[1]
+        self._sw_version = _sw_version
+        return _sw_version
+
+    @property
     def version(self):
         """
         Cisco Specific
@@ -650,6 +678,8 @@ class Switch(NetworkDevice):
         self._collect_version()
         self._collect_license()
         self.populate_lite_time = time.time() - start_time
+        _ = self.flash
+        _ = self.supervisor
 
     def collect_mac_table(self):
         """

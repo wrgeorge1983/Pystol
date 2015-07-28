@@ -277,14 +277,14 @@ class clintSwitch(sshutil.Switch):
     @property
     def flash_total(self):
         try:
-            return '{0}K'.format(self.flash.total)
+            return self.flash.total
         except:
             return 'UNK'
 
     @property
     def flash_free(self):
         try:
-            return '{0}K'.format(self.flash.free)
+            return self.flash.free
         except:
             return 'UNK'
 
@@ -354,9 +354,13 @@ class WorkbookWrapper(object):
                 'hostname': 'hostname',
                 'ip address': 'ip',
                 'supervisor': 'supervisor',
-                'ram (k)': 'installed_ram',
+                'ram (k)': 'available_ram',
                 'total flash': 'flash_total',
                 'free flash': 'flash_free',
+                'model': 'model',
+                'stacked': 'stacked',
+                'old': 'software_version',
+                'feature set (license)': 'license'
             }
         )
 
@@ -388,10 +392,11 @@ class WorkbookWrapper(object):
                 continue
             for index, cell in enumerate(row):
                 try:
-                    rslt = cell.value, getattr(switch, str(am[header[index]]), 'UNK')
+                    rslt = getattr(switch, str(am[header[index]]), 'UNK')
                 except:
                     rslt = 'UNK'
-                cell.value = rslt
+                if rslt != 'UNK':
+                    cell.value = rslt
 
 
     # def validate_hostname(self, switch, value):
@@ -432,8 +437,11 @@ class WorkbookWrapper(object):
         attrib_from_cell = lambda x: self.header[self.column_from_string(x.column)]
         attrs = dict((attrib_from_cell(cell), cell.value) for cell in row
                           if cell.value is not None)
+        try:
+            switch = clintSwitch(ip=attrs['ip address'])
+        except KeyError:
+            return None
 
-        switch = clintSwitch(ip=attrs['ip address'])
         switch.row_index = row_index
         return switch
 
@@ -457,7 +465,7 @@ def test_wb_switches():
     global pool
     global rslts
     wb = WorkbookWrapper('bia-netw.xlsx')
-    switches = wb.switches_from_rows()
+    switches = [switch for switch in wb.switches_from_rows() if switch is not None]
     pool = multiprocessing.pool.ThreadPool(processes=32)
     start_time = time.time()
     rslts = pool.map_async(populate_switch, switches)
