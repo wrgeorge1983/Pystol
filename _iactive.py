@@ -360,6 +360,7 @@ class WorkbookWrapper(object):
                 'model': 'model',
                 'stacked': 'stacked',
                 'old': 'software_version',
+                'current': 'software_version',
                 'feature set (license)': 'license'
             }
         )
