@@ -359,6 +359,7 @@ class WorkbookWrapper(object):
                 'free flash': 'flash_free',
                 'model': 'model',
                 'stacked': 'stacked',
+                'current': 'software_version',
                 'old': 'software_version',
                 'feature set (license)': 'license'
             }
