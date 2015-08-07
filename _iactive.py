@@ -498,7 +498,6 @@ def test_wb_switches():
 
         time.sleep(increment)
 
-
     pool.close()
     pool.join()
 
