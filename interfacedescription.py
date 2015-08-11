@@ -26,7 +26,8 @@ import multiprocessing.pool
 
 # Imports from other scripts in this project
 import sshutil
-from sshutil import get_credentials, Switch  # EndDevice, SwitchPort
+from sshutil import get_credentials  # EndDevice, SwitchPort
+from networkdevices.networkdevice import Switch
 from sshutil import Date, DateTime  # DeduplicateList
 import metrics
 

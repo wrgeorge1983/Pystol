@@ -11,6 +11,7 @@ from optparse import OptionParser
 
 
 # Imports from other scripts in this project
+import networkdevices.networkdevice
 from sshexecute import sshrun
 import metrics
 from sshutil import listify, format_mac_address, get_credentials  # , resolve_mac
@@ -239,7 +240,7 @@ def ResolveMAC(device, ip, creds):
     # longer the case, change the parameters.
     # ==========================================================================
 
-    device = sshutil.Switch(ip=device, creds=creds)
+    device = networkdevices.networkdevice.Switch(ip=device, creds=creds)
     lines = device.execute('ping {0}'.format(ip), timeout=5)
     line = device.execute('sh arp | i {0}'.format(ip))
 

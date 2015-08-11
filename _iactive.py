@@ -16,7 +16,8 @@ import time
 from subprocess import Popen
 from collections import defaultdict
 import multiprocessing.pool
-import collections
+
+import networkdevices
 
 sys.path += [os.getcwd()]
 
@@ -244,49 +245,39 @@ class IPAM(phpipam.PHPIPAM):
         return rslt
 
 
-# Wrapps Switch() with features that are great for interactive access,
-# but would be terrible to use in an normal script.
-class clintSwitch(sshutil.Switch):
-    def __init__(self, ip=None, creds=None, timeout=None):
-        if timeout:
-            self.timeout = timeout
-        elif not hasattr(self, 'timeout'):
-            self.timeout = None
+class InteractiveMixin(object):
+    """
+    mixin that presumes children are subclasses of networkdevices.NetworkDevice
+    """
+    def tweak_defaults(self, **kwargs):
+        """
+        modifies defaults to better suit interactive use
+        :param kwargs:
+        :return:
+        """
+        self.timeout = kwargs.get('timeout', None)
 
-        if creds:
-            clintSwitch.credentials = creds
-        else:
+        creds = kwargs.get('creds', None)
+        if creds is None:
             if not hasattr(self, "credentials"):
-                raise SyntaxError("Credentials must be provided at least once.")
+                raise SyntaxError("Credentials must be provided at least one.")
             creds = self.credentials
-        if ip:
+
+        ip = kwargs.get('ip', None)
+        if ip is not None:
             ip = str(ip)
-            site = ip
             ips = ip.split('.')
             if len(ips) == 4:
-                clintSwitch.site = site
+                self.__class__.site = ip
             else:
                 if not hasattr(self, 'site'):
-                    raise SyntaxError("Full IP must be provided at least once.")
-                ip = ipm(clintSwitch.site, ip)
-                clintSwitch.site = ip
+                    raise SyntaxError("Full IP must be provided at least once")
+                ip = ipm(self.site, ip)
+                self.site = ip
         else:
             ip = 'None'
-        sshutil.Switch.__init__(self, ip, creds)
 
-    @property
-    def flash_total(self):
-        try:
-            return self.flash.total
-        except:
-            return 'UNK'
-
-    @property
-    def flash_free(self):
-        try:
-            return self.flash.free
-        except:
-            return 'UNK'
+        return {'creds': creds, 'ip': ip}
 
     def pexecute(self, cmd, trim=True, timeout=None):
         args = [cmd, trim]
@@ -305,6 +296,28 @@ class clintSwitch(sshutil.Switch):
     def bufferflush(self):
         return self.connection.buffer_flush()
 
+
+# Wrapps Switch() with features that are great for interactive access,
+# but would be terrible to use in an normal script.
+class clintSwitch(InteractiveMixin, networkdevices.Switch):
+    def __init__(self, ip=None, creds=None, timeout=None):
+        kwargs = self.tweak_defaults(ip=ip, creds=creds, timeout=timeout)
+
+        networkdevices.Switch.__init__(self, **kwargs)
+
+    @property
+    def flash_total(self):
+        try:
+            return self.flash.total
+        except:
+            return 'UNK'
+
+    @property
+    def flash_free(self):
+        try:
+            return self.flash.free
+        except:
+            return 'UNK'
 
 def poll_switch(sw, cmd, sleep_time):
     """sw.pexecute(cmd) every sleep_time seconds"""
@@ -452,7 +465,6 @@ class WorkbookWrapper(object):
 
     def get_attribs(self, switch):
         pass
-
 
 # TODO: These are here only for testing purposes and should be pruned / factored out
 def populate_switch(switch):

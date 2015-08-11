@@ -12,7 +12,7 @@ import multiprocessing.pool
 
 # Imports from other scripts in this project
 from sshutil import get_credentials
-from sshutil import Switch
+from networkdevices.networkdevice import Switch
 from sshutil import deduplicate_list
 import metrics
 

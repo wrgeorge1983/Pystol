@@ -6,6 +6,7 @@ Created on Jan 9, 2015
 '''
 
 import unittest
+import networkdevices.networkdevice
 import sshutil
 from optparse import OptionParser
 
@@ -84,7 +85,7 @@ class sshutilSwitchTC(unittest.TestCase):
         self.sampleData['IP'] = ['10.217.225.140']
 
     def test_SwitchGetInterfaces(self):
-        sw = sshutil.Switch(ip=self.sampleData['IP'][0], creds=None)
+        sw = networkdevices.networkdevice.Switch(ip=self.sampleData['IP'][0], creds=None)
         self.assertEqual(sw.state, 'UNK', 'switch.state doesn\'t'
                          'default to "UNK"')
         sw._get_interfaces(data=self.sampleData['Interface'][1])
@@ -108,7 +109,7 @@ class sshutilSwitchTC(unittest.TestCase):
                          ''.format(sw.ports[51], sw.ports[51].description))
 
     def test_SwitchClassifyPorts(self):
-        sw = sshutil.Switch(ip=self.sampleData['IP'][0], creds=None)
+        sw = networkdevices.networkdevice.Switch(ip=self.sampleData['IP'][0], creds=None)
         sw._get_interfaces(data=self.sampleData['Interface'][1])
         sw._classify_ports(self.sampleData['InterfaceSwitchport'][1])
         print sw
@@ -162,13 +163,13 @@ class sshutilSwitchPortTC(unittest.TestCase):
 
     def test_init(self):
         try:
-            sp = sshutil.SwitchPort()
+            sp = networkdevices.networkdevice.SwitchPort()
         except Exception as E:
             self.fail('clswitchport._init_() threw an exception!')
             raise E
 
     def test_get_edge(self):
-        sp = sshutil.SwitchPort()
+        sp = networkdevices.networkdevice.SwitchPort()
         for sample in self.sampleData['get_edge']:
             eRslt = sample[2]  # expected Result
             aRslt = sp._get_edge(sample[0], sample[1])
@@ -179,7 +180,7 @@ class sshutilSwitchPortTC(unittest.TestCase):
             self.assertEqual(eRslt, aRslt, msg)
 
     def test_switchportMode(self):
-        sp = sshutil.SwitchPort()
+        sp = networkdevices.networkdevice.SwitchPort()
         self.assertEqual(sp.switchportMode, 'access', 'clswitchportMode'
                          'default\n    Expected: {0}\n    Returned: {1}\n'
                          ''.format('access', sp.switchportMode))

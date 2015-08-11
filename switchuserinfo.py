@@ -26,7 +26,7 @@ from optparse import OptionParser
 
 # Imports from other scripts in this project
 from sshutil import get_credentials
-from sshutil import Switch
+from networkdevices.networkdevice import Switch
 import sshutil
 import metrics
 

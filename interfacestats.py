@@ -11,7 +11,8 @@ import getopt
 import csv
 
 # Imports from other scripts in this project
-from sshutil import get_credentials, Switch
+from sshutil import get_credentials
+from networkdevices.networkdevice import Switch
 from sshutil import deduplicate_list
 from metrics import PrintMetrics
 from metrics import DebugPrint
