@@ -348,7 +348,7 @@ class WorkbookWrapper(object):
         self.cell = self.ws.cell
 
         self.build_header()
-        self.attribute_mapping = defaultdict(lambda: None)
+        self.attribute_mapping = dict()
 
         self.attribute_mapping.update(  # maps header fields to object attributes
             {
