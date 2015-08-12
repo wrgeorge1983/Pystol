@@ -390,10 +390,10 @@ class WorkbookWrapper(object):
         header = self.header
 
         for row, switch in zip(self.rows[1:], switches):  # skip header row obviously
-            skipped = []
+            skipped = set()
             note = ''
             note_header = 'script notes'
-            note_cell = row[header[note_header]]
+            note_cell = row[int(header[note_header])]
             for index, cell in enumerate(row):
                 if switch.state.upper() != 'UP':
                     note = 'unreachable as of {0}'.format(str(date.today()))
@@ -407,9 +407,15 @@ class WorkbookWrapper(object):
 
                 except (AttributeError, KeyError):
                     if header_text.strip().lower() != note_header:
-                        skipped.append(header_text)
+                        skipped.add(header_text.lower())
                     elif skipped:
-                        note = 'skipped: {0}'.format(str(skipped))
+                        note = 'skipped: {0}'.format(
+                            str(
+                                skipped.difference(
+                                    [header.keys()]
+                                )
+                            )
+                        )
                     continue
 
                 cell.value = rslt
