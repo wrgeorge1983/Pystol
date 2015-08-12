@@ -411,8 +411,8 @@ class WorkbookWrapper(object):
                     elif skipped:
                         note = 'skipped: {0}'.format(
                             str(
-                                skipped.difference(
-                                    [header.keys()]
+                                skipped.intersection(
+                                    self.attribute_mapping.keys()
                                 )
                             )
                         )
