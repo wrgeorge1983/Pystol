@@ -33,7 +33,7 @@ class EndDevice(object):
 
     @switchport.setter
     def switchport(self, port):  # could be SwitchPort or str
-        if not isinstance(self.switch, Switch):
+        if not isinstance(self.switch, CiscoIOS):
             self._switchport = format_interface_name(str(port))
             # if switch is str, this must also be str
             return
@@ -62,7 +62,7 @@ class EndDevice(object):
 
     @switch.setter
     def switch(self, switch):
-        # needs to be an actual Switch or None or String
+        # needs to be an actual CiscoIOS or None or String
         if type(switch) == str:
             self._switch = switch
             return
@@ -104,7 +104,54 @@ class EndDevice(object):
         return NotImplemented
 
 
-class NetworkDevice(object):
+class DispatchMeta(type):
+    """
+    Metaclass for registering NetworkDevice subclasses
+    'mcs' == this metaclass
+    'cls' == class being created
+    """
+    def __init__(cls, cls_name, cls_bases, cls_dict):
+        # Base class *IS* included in registry to serve as a default
+        registry = cls_dict.setdefault('registry', set())
+        registry.add(cls)
+
+        super(DispatchMeta, cls).__init__(cls_name, cls_bases, cls_dict)
+
+
+class DispatchableClass(object, metaclass=DispatchMeta):
+    """
+    Base class to build class registry.  Classes override these methods
+    """
+
+    def __init__(self):
+        raise NotImplementedError
+
+    @classmethod
+    def match_class(cls, instance):
+        """
+        Can this class handle this device?
+        Subclasses should only use interfaces and attributes explicitly known to be
+               defined by their parents
+
+        Subclasses should be allowed to fall-through, but never this far.
+        """
+
+        if 'DispatchableClass' not in cls.__name__:
+            return NotImplementedError
+
+        return False
+
+    def search_registry(self):
+        matches = [cls for cls in self.registry if cls.match_class(self)]
+        best_match = matches[0]
+        for match in matches[1:]:
+            if len(match.mro()) > len(best_match.mro()):
+                best_match = match
+
+        return match
+
+class NetworkDevice(DispatchableClass):
+
     def __init__(self, ip='None', creds=None):  # str ip
         self._ip = 'None'
         self.ip = ip
@@ -125,7 +172,7 @@ class NetworkDevice(object):
         if type(arg) in [str, type(None)]:
             self._ip = str(arg)
         else:
-            raise Exception('can\'t set \'Switch({0}).ip\' to {1}'
+            raise Exception('can\'t set \'CiscoIOS({0}).ip\' to {1}'
                             ''.format(self, type(arg)))
 
     def _connect(self):
@@ -139,7 +186,7 @@ class NetworkDevice(object):
         Connect to switch and execute 'command'
         """
         self._connect()
-        UpdateMetric('Switch.execute')
+        UpdateMetric('CiscoIOS.execute')
         try:
             lines = self.connection.run(command=command,
                                         trim=trim,
@@ -151,12 +198,22 @@ class NetworkDevice(object):
             self.state = 'UP'
             return lines
 
+    @classmethod
+    def match_class(cls, instance):
+        """
+        Always assumed to be an option
+        """
+        return True
+
 
 class Riverbed(NetworkDevice):
-    pass
+    @classmethod
+    def match_class(cls, instance):
+        regex = re.compile(r'Product model:\s+CX\d{3}\n').search
+        return bool(regex(instance.execute('sh ver', timeout=5)))
 
 
-class Switch(NetworkDevice):
+class CiscoIOS(NetworkDevice):
     """
         represent a switch, contains clSwitchPorts and references
         to their clEndDevices
@@ -168,6 +225,11 @@ class Switch(NetworkDevice):
         self.cdp_information = {}
         self._mac_address_table = ''
         self.populate_lite_time = None
+
+    @classmethod
+    def match_class(cls, instance):
+        version_string = instance.execute('sh ver').strip()
+        return version_string.startswith('Cisco IOS Software')
 
     @property
     def hostname(self):
@@ -268,11 +330,11 @@ class Switch(NetworkDevice):
     def model(self):
         """
         Deduces this switches model number from 'sh ver' output.
-        This will fail gracefully to 'UNK', but 'Switch.supported' will return False in
+        This will fail gracefully to 'UNK', but 'CiscoIOS.supported' will return False in
             this case and many features will refuse to run.
         :return:
         """
-        if self.state == 'UP':
+        if self.state in self.goodstates:
             for line in self.version.splitlines():
                 if 'bytes of' in line.lower():
                     return line.split()[1]
@@ -449,7 +511,7 @@ class Switch(NetworkDevice):
            Pull Version info
         """
         command = 'sh ver'
-        UpdateMetric('Switch._collect_version')
+        UpdateMetric('CiscoIOS._collect_version')
         try:
             rBuffer = self.execute(command)
         except:
@@ -474,7 +536,7 @@ class Switch(NetworkDevice):
                     self.ports[i].switch = self
                 i += 1
         else:
-            raise Exception('can\'t set \'Switch({0}).ports\''
+            raise Exception('can\'t set \'CiscoIOS({0}).ports\''
                             'with {1}'.format(self, type(arg)))
 
     @property
@@ -486,7 +548,7 @@ class Switch(NetworkDevice):
         if type(arg) == list:
             self._devices = arg
         else:
-            raise Exception('can\'t set \'Switch({0}).devices\' with {1}'
+            raise Exception('can\'t set \'CiscoIOS({0}).devices\' with {1}'
                             ''.format(self, type(arg)))
 
     def populate(self):
@@ -546,7 +608,7 @@ class Switch(NetworkDevice):
         Connect to switch and pull MAC Address table
         """
         command = 'sh mac address-table'
-        UpdateMetric('Switch.collect_mac_table')
+        UpdateMetric('CiscoIOS.collect_mac_table')
         lines = self.execute(command)
         self._mac_address_table = '\n'.join(
             [x for x in lines.splitlines() if 'dynamic' in x.lower()])
@@ -563,7 +625,7 @@ class Switch(NetworkDevice):
         Return all interfaces on a switch, including stats
         """
         command = 'show interface'
-        UpdateMetric('Switch._get_interfaces')
+        UpdateMetric('CiscoIOS._get_interfaces')
         if not data:
             try:
                 lines = self.execute(command).splitlines()
@@ -603,7 +665,7 @@ class Switch(NetworkDevice):
                NieghborPort)
         """
         command = 'sh cdp ne det'
-        UpdateMetric('Switch._collect_cdp_information')
+        UpdateMetric('CiscoIOS._collect_cdp_information')
         try:
             rBuffer = self.execute(command)
         except:
@@ -648,7 +710,7 @@ class Switch(NetworkDevice):
         switchport = ''
         mode = ''
         command = 'sh int switchport'
-        UpdateMetric('Switch._classify_ports')
+        UpdateMetric('CiscoIOS._classify_ports')
         if data:
             rBuffer = data.strip()
         else:
@@ -660,7 +722,7 @@ class Switch(NetworkDevice):
                 raise
 
         spLines = rBuffer.splitlines()
-        DebugPrint('Switch.ports: {0}'.format(self.ports))
+        DebugPrint('CiscoIOS.ports: {0}'.format(self.ports))
         for line in spLines:
             if 'Name:' in line:
                 name = format_interface_name(line.split()[-1])
@@ -757,7 +819,7 @@ class Switch(NetworkDevice):
         return rslt
 
     def __repr__(self):
-        return ('Switch(ip={0}, Ports={1}, Devices={2})'
+        return ('CiscoIOS(ip={0}, Ports={1}, Devices={2})'
                 ''.format(self.ip, len(self.ports), len(self.devices)))
 
     def __str__(self):
@@ -770,16 +832,30 @@ class Switch(NetworkDevice):
         return not (self == other)
 
 
+class CiscoASA(NetworkDevice):
+    @classmethod
+    def match_class(cls, instance):
+        version_string = instance.execute('sh ver').strip()
+        return version_string.startswith('Cisco Adaptive Security Appliance Software')
+
+
+class CiscoNXOS(NetworkDevice):
+    @classmethod
+    def match_class(cls, instance):
+        version_string = instance.execute('sh ver').strip()
+        return version_string.startswith('Cisco Nexus Operating System')
+
+
 class SwitchPort(object):
     """
-        Represent ports attached to a Switch.  Contains
+        Represent ports attached to a CiscoIOS.  Contains
         EndDevice objects and reference to its parent
-        Switch.
+        CiscoIOS.
     """
 
     def __init__(self, name=None, switch=None, switchportMode=None,
                  detail=None):
-        # str ip, Switch switch
+        # str ip, CiscoIOS switch
         self.stats = {}
         self.switchportMode = switchportMode
         self.CDPneigh = []
@@ -924,7 +1000,7 @@ class SwitchPort(object):
         return self._get_edge(self.CDPneigh, self.switchportMode)
 
     def __repr__(self):
-        return ('SwitchPort(Name={0}, Switch={1}, switchportMode={2},'
+        return ('SwitchPort(Name={0}, CiscoIOS={1}, switchportMode={2},'
                 'CDPneigh={3}, Devices={4})'
                 ''.format(self.name, self.switch, self.switchportMode,
                           len(self.CDPneigh), len(self.devices)))

@@ -297,13 +297,13 @@ class InteractiveMixin(object):
         return self.connection.buffer_flush()
 
 
-# Wrapps Switch() with features that are great for interactive access,
+# Wrapps CiscoIOS() with features that are great for interactive access,
 # but would be terrible to use in an normal script.
-class clintSwitch(InteractiveMixin, networkdevices.Switch):
+class clintCiscoIOS(InteractiveMixin, networkdevices.CiscoIOS):
     def __init__(self, ip=None, creds=None, timeout=None):
         kwargs = self.tweak_defaults(ip=ip, creds=creds, timeout=timeout)
 
-        networkdevices.Switch.__init__(self, **kwargs)
+        networkdevices.CiscoIOS.__init__(self, **kwargs)
 
     @property
     def flash_total(self):
@@ -453,7 +453,7 @@ class WorkbookWrapper(object):
         attrs = dict((attrib_from_cell(cell), cell.value) for cell in row
                           if cell.value is not None)
         try:
-            switch = clintSwitch(ip=attrs['ip address'])
+            switch = clintCiscoIOS(ip=attrs['ip address'])
         except KeyError:
             return None
 

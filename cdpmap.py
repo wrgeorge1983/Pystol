@@ -12,7 +12,7 @@ import multiprocessing.pool
 
 # Imports from other scripts in this project
 from sshutil import get_credentials
-from networkdevices.networkdevice import Switch
+from networkdevices.networkdevice import CiscoIOS
 from sshutil import deduplicate_list
 import metrics
 
@@ -94,7 +94,7 @@ def main(argv):
     switches = []
     hosts = deduplicate_list(hosts)
     for host in hosts:
-        switch = Switch(ip=host, creds=CREDENTIALS)
+        switch = CiscoIOS(ip=host, creds=CREDENTIALS)
         switches.append(switch)
 
     if MAX_THREADS > 1:  # Single or MultiThreaded...
@@ -114,7 +114,7 @@ def main(argv):
                     ''.format(switch.ip, switch.model, len(switch.ports)))
         for interface in switch.ports:
             for entry in interface.CDPneigh:
-                if 'Switch' in entry[2] or 'Router' in entry[2]:
+                if 'CiscoIOS' in entry[2] or 'Router' in entry[2]:
                     oBuffer += '--{0}\n'.format(interface.name)
                     oBuffer += '----{0}\n'.format(interface.CDPneigh)
         oBuffer += '\n\n'

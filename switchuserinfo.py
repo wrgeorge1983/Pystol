@@ -26,7 +26,7 @@ from optparse import OptionParser
 
 # Imports from other scripts in this project
 from sshutil import get_credentials
-from networkdevices.networkdevice import Switch
+from networkdevices.networkdevice import CiscoIOS
 import sshutil
 import metrics
 
@@ -59,7 +59,7 @@ def createParser():
                       'this if you expect to make sense of the debug output.',
                       default='True')
     parser.add_option('-o', '--outfile', help='Primary output to listed file.')
-    parser.add_option('-g', '--defaultgateway', help='Switch or router to use '
+    parser.add_option('-g', '--defaultgateway', help='CiscoIOS or router to use '
                       'for MAC-> IP resolution (via ARP table lookup).')
     parser.add_option('-v', '--verbose', action='count', help='Increase output'
                       ' verbosity (e.g., -vv is more than -v) up to 3.',
@@ -130,7 +130,7 @@ def main(argv):
     metrics.DebugPrint('hosts:' + str(hosts), 1)
     switches = []
     for host in hosts:
-        switches.append(Switch(ip=host, creds=CREDENTIALS))
+        switches.append(CiscoIOS(ip=host, creds=CREDENTIALS))
 
     endDevices = sshutil.process_end_devices(hosts=switches, creds=CREDENTIALS,
                                            maxThreads=maxThreads,

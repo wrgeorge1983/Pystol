@@ -40,8 +40,8 @@ except:
     raise
 
 creds = sshutil.get_credentials()
-clintSwitch.credentials = creds
-clintSwitch.site = DEFAULT_SW_IP
+clintCiscoIOS.credentials = creds
+clintCiscoIOS.site = DEFAULT_SW_IP
 if __name__ == "__console__":
     pass
 else:

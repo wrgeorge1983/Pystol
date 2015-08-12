@@ -12,7 +12,7 @@ import csv
 
 # Imports from other scripts in this project
 from sshutil import get_credentials
-from networkdevices.networkdevice import Switch
+from networkdevices.networkdevice import CiscoIOS
 from sshutil import deduplicate_list
 from metrics import PrintMetrics
 from metrics import DebugPrint
@@ -99,10 +99,10 @@ def main(argv):
     hosts = deduplicate_list(hosts)
     switches = []
     for host in hosts:
-        switch = Switch(ip=host, creds=CREDENTIALS)
+        switch = CiscoIOS(ip=host, creds=CREDENTIALS)
         switches.append(switch)
         # we're getting ALL interfaces here, as opposed to non-trunks typically
-        DebugPrint('Switch._get_interfaces(): {0}'
+        DebugPrint('CiscoIOS._get_interfaces(): {0}'
                    ''.format(str(switch)))
         switch._get_interfaces()
         oBuffer += switch.ip + '\n'
@@ -132,7 +132,7 @@ def main(argv):
         with open(csvfile, 'w') as fCSV:
             csvWriter = csv.writer(fCSV, delimiter=',', quotechar='|',
                                    quoting=csv.QUOTE_MINIMAL)
-            csvWriter.writerow(['Switch', 'Interface'] + stats)
+            csvWriter.writerow(['CiscoIOS', 'Interface'] + stats)
             # print switches
             for switch in switches:
                 # print sorted(switch.ports)

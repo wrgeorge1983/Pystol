@@ -236,11 +236,11 @@ def ResolveMAC(device, ip, creds):
     # DebugPrint('resolve_mac.creds[0]: ' + creds[0])
 
     # ==========================================================================
-    # Assume that device is NOT already a Switch Object.  When that is no
+    # Assume that device is NOT already a CiscoIOS Object.  When that is no
     # longer the case, change the parameters.
     # ==========================================================================
 
-    device = networkdevices.networkdevice.Switch(ip=device, creds=creds)
+    device = networkdevices.networkdevice.CiscoIOS(ip=device, creds=creds)
     lines = device.execute('ping {0}'.format(ip), timeout=5)
     line = device.execute('sh arp | i {0}'.format(ip))
 

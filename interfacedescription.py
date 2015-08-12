@@ -27,7 +27,7 @@ import multiprocessing.pool
 # Imports from other scripts in this project
 import sshutil
 from sshutil import get_credentials  # EndDevice, SwitchPort
-from networkdevices.networkdevice import Switch
+from networkdevices.networkdevice import CiscoIOS
 from sshutil import Date, DateTime  # DeduplicateList
 import metrics
 
@@ -50,7 +50,7 @@ def createParser():
     parser.add_option('-u', '--username', help='Username to use to connect.'
                       ' *Will assume currently logged in user if not provided.'
                       )
-    parser.add_option('-g', '--gateway', help='Switch or router to use for '
+    parser.add_option('-g', '--gateway', help='CiscoIOS or router to use for '
                       'MAC -> IP resolution (via ARP table lookup).')
     parser.add_option('-d', '--threads', type='int', help='Number of threads '
                       'to use for DNS resolution (or other tasks).',
@@ -174,7 +174,7 @@ def main(argv):
 
 def prepCommands(switch, edge):
     '''
-        Given Switch, iterate through SwitchPort objects
+        Given CiscoIOS, iterate through SwitchPort objects
         prepare commands to apply descriptions
         only to ports that have no CDP switch neighbor and no manually applied
         description
@@ -261,7 +261,7 @@ def PrepareSwitches(hosts, creds, defaultgateway):
     '''
         Given host,creds,defaultgateway, call switchuserinfo.process_end_devices
         use 'switch' strings in each EndDevice to populate list of switches,
-        properly link Switch and EndDevice ojbects
+        properly link CiscoIOS and EndDevice ojbects
         create device.switchport.  device.switchport property handles linking
         return list of switches
     '''
@@ -269,7 +269,7 @@ def PrepareSwitches(hosts, creds, defaultgateway):
     switches = []
 
     for host in hosts:
-        sw = Switch(ip=host, creds=creds)
+        sw = CiscoIOS(ip=host, creds=creds)
         switches.append(sw)
 
     if MULTITHREADING:
@@ -321,7 +321,7 @@ def PopulateSwitchesST(switches):
 
 
 def PopulateSwitch(switch):
-    metrics.DebugPrint('Populating Switch: {0}'.format(switch.ip), 2)
+    metrics.DebugPrint('Populating CiscoIOS: {0}'.format(switch.ip), 2)
     switch.populate()
     return switch
 

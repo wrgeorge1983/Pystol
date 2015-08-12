@@ -85,7 +85,7 @@ class sshutilSwitchTC(unittest.TestCase):
         self.sampleData['IP'] = ['10.217.225.140']
 
     def test_SwitchGetInterfaces(self):
-        sw = networkdevices.networkdevice.Switch(ip=self.sampleData['IP'][0], creds=None)
+        sw = networkdevices.networkdevice.CiscoIOS(ip=self.sampleData['IP'][0], creds=None)
         self.assertEqual(sw.state, 'UNK', 'switch.state doesn\'t'
                          'default to "UNK"')
         sw._get_interfaces(data=self.sampleData['Interface'][1])
@@ -109,7 +109,7 @@ class sshutilSwitchTC(unittest.TestCase):
                          ''.format(sw.ports[51], sw.ports[51].description))
 
     def test_SwitchClassifyPorts(self):
-        sw = networkdevices.networkdevice.Switch(ip=self.sampleData['IP'][0], creds=None)
+        sw = networkdevices.networkdevice.CiscoIOS(ip=self.sampleData['IP'][0], creds=None)
         sw._get_interfaces(data=self.sampleData['Interface'][1])
         sw._classify_ports(self.sampleData['InterfaceSwitchport'][1])
         print sw
@@ -229,8 +229,8 @@ def createParser():
     testSuiteHelp = ('What test suite to run.                             '
                      'Default:                                        all '
                      'fin:                    sshutil.formatinterfacename '
-                     'switchgi:                  Switch._get_interfaces() '
-                     'switchcp:                  Switch._classify_ports() '
+                     'switchgi:                  CiscoIOS._get_interfaces() '
+                     'switchcp:                  CiscoIOS._classify_ports() '
                      'switchport:          SwitchPort, multiple methods '
                      'all:                               self explanatory ')
     parser = OptionParser(usage)
