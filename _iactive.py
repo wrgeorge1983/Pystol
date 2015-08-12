@@ -8,15 +8,16 @@ Credit to /r/Python for the non-wasteful and sensible handling of oldInit and
     newInit
 """
 # Standard Library Imports
-import os
-import sys
-import json
-from pprint import pprint  # Not used here, but we want it in interactive mode.
-import time
-from subprocess import Popen
 from collections import defaultdict
-import multiprocessing.pool
 import collections
+from datetime import date
+import json
+import multiprocessing.pool
+import os
+from pprint import pprint  # Not used here, but we want it in interactive mode.
+from subprocess import Popen
+import sys
+import time
 
 sys.path += [os.getcwd()]
 
@@ -359,7 +360,6 @@ class WorkbookWrapper(object):
                 'free flash': 'flash_free',
                 'model': 'model',
                 'stacked': 'stacked',
-                'current': 'software_version',
                 'old': 'software_version',
                 'current': 'software_version',
                 'feature set (license)': 'license'
@@ -390,15 +390,31 @@ class WorkbookWrapper(object):
         header = self.header
 
         for row, switch in zip(self.rows[1:], switches):  # skip header row obviously
-            if switch.state.upper() != 'UP':
-                continue
+            skipped = []
+            note = ''
+            note_header = 'script notes'
+            note_cell = row[header[note_header]]
             for index, cell in enumerate(row):
+                if switch.state.upper() != 'UP':
+                    note = 'unreachable as of {0}'.format(str(date.today()))
+                    break
+
+                header_text = header[index]
                 try:
-                    rslt = getattr(switch, str(am[header[index]]), 'UNK')
-                except:
-                    rslt = 'UNK'
-                if rslt != 'UNK':
-                    cell.value = rslt
+                    rslt = getattr(switch, str(am[header_text]), 'UNK')
+                    if rslt == 'UNK':
+                        raise AttributeError
+
+                except (AttributeError, KeyError):
+                    if header_text.strip().lower() != note_header:
+                        skipped.append(header_text)
+                    elif skipped:
+                        note = 'skipped: {0}'.format(str(skipped))
+                    continue
+
+                cell.value = rslt
+            note_cell.value = note
+
 
 
     # def validate_hostname(self, switch, value):
@@ -460,6 +476,7 @@ def populate_switch(switch):
         switch.populate_lite()
     except:
         pass
+
 
 def test_wb_switches():
     global wb
