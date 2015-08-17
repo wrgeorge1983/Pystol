@@ -9,6 +9,7 @@ Credit to /r/Python for the non-wasteful and sensible handling of oldInit and
 """
 # Standard Library Imports
 from collections import defaultdict
+import concurrent.futures
 import collections
 from datetime import date
 import json

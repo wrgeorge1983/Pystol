@@ -677,9 +677,9 @@ class Switch(NetworkDevice):
         self._collect_startup_config()
         self._collect_version()
         self._collect_license()
-        self.populate_lite_time = time.time() - start_time
         _ = self.flash
         _ = self.supervisor
+        self.populate_lite_time = time.time() - start_time
 
     def collect_mac_table(self):
         """
