@@ -422,23 +422,6 @@ class WorkbookWrapper(object):
                 cell.value = rslt
             note_cell.value = note
 
-
-
-    # def validate_hostname(self, switch, value):
-    #     if switch.hostname == value:
-    #         return True, switch.hostname
-    #     else:
-    #         return False, switch.hostname
-    #
-    # def validate_supervisor(self, switch, value):
-    #     sup = switch.supervisor
-    #     return sup == value, sup
-    #
-    # @staticmethod
-    # def validate_switch_attribute(switch, attribute, value):
-    #     ref = getattr(switch, attribute)
-    #     return ref == value, ref
-
     @staticmethod
     def load_workbook(filename):
         """
@@ -476,6 +459,38 @@ class WorkbookWrapper(object):
     def get_attribs(self, switch):
         pass
 
+    def update_devices(self, method='futures_pp', workers=128):
+        method = method.lower()
+        assert method in ('multiprocessing', 'futures_tp', 'futures_pp'), 'unknown method'
+
+        switches = [switch for switch in
+                    self.switches_from_rows() if
+                    switch is not None]
+
+        start_time = time.time()
+        if method == 'multiprocessing':
+            pool = multiprocessing.pool.ThreadPool(processes=workers)
+            map_func = pool.map_async
+
+        elif method == 'futures_tp':
+            pool = concurrent.futures.ThreadPoolExecutor(max_workers=workers)
+            map_func = pool.map
+
+        elif method == 'futures_pp':
+            pool = concurrent.futures.ProcessPoolExecutor(max_workers=workers)
+            map_func = pool.map
+
+        self.pool = pool
+
+        print('before map')
+        self.map_results = map_func(populate_switch, switches)
+        print('after map')
+        if 'future' in method:
+            pass
+
+        elif method == 'multiprocessing':
+            pass
+
 
 # TODO: These are here only for testing purposes and should be pruned / factored out
 def populate_switch(switch):
@@ -485,21 +500,70 @@ def populate_switch(switch):
         pass
 
 
-def test_wb_switches():
+
+def test_wb_switches(method='futures_pp', workers=128):
+    method = method.lower()
+    assert method in ('multiprocessing', 'futures_tp', 'futures_pp'), 'unknown method'
+
     global wb
     global switches
     global pool
     global rslts
+    global test_wb_switches_start
+
     wb = WorkbookWrapper('bia-netw.xlsx')
-    switches = [switch for switch in wb.switches_from_rows() if switch is not None]
-    pool = multiprocessing.pool.ThreadPool(processes=32)
-    start_time = time.time()
-    rslts = pool.map_async(populate_switch, switches)
+    switches = [switch for switch in
+                wb.switches_from_rows() if
+                switch is not None]
+
+    test_wb_switches_start = time.time()
+
+    if method == 'multiprocessing':
+        pool = multiprocessing.pool.ThreadPool(processes=workers)
+
+        print('before map')
+        rslts = pool.map_async(populate_switch, switches)
+        print('after map')
+
+        yield rslts
+
+    elif method == 'futures_tp':
+        pool = concurrent.futures.ThreadPoolExecutor(max_workers=workers)
+
+        print('before map')
+        pool.map(populate_switch, switches)
+        print('after map')
+
+        yield pool
+
+    elif method == 'futures_pp':
+        pool = concurrent.futures.ProcessPoolExecutor(max_workers=workers)
+
+        print('before map')
+        rslts = pool.map(populate_switch, switches)
+        print('after map')
+
+        yield rslts
+
+
+def report_completion(method):
+    assert method.lower() in ('multiprocessing', 'futures_tp', 'futures_pp'), 'unknown method'
+
+    global switches
+    global pool
+    global executor
+    global test_wb_switches_start
+
+    start_time = test_wb_switches_start
+
     increment_table = {100: 5, 50: 3, 25: 1, 10: 0.5}
     remaining_q = []
     increment = 5
+
     while True:
-        remaining_switches = [switch.ip for switch in switches if switch.state == 'UNK']
+        remaining_switches = [switch.ip for switch
+                              in switches if
+                              switch.state == 'UNK']
         remaining = len(remaining_switches)
         if remaining == 0:
             return
@@ -521,8 +585,3 @@ def test_wb_switches():
         remaining_q.append(remaining)
 
         time.sleep(increment)
-
-    pool.close()
-    pool.join()
-
-
