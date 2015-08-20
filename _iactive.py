@@ -44,7 +44,8 @@ try:
     DEFAULT_IPAM_API_ID = iactiveconstants.DEFAULT_IPAM_API_ID
     DEFAULT_IPAM_API_KEY = iactiveconstants.DEFAULT_IPAM_API_KEY
 except ImportError:
-    pass
+    print('iactiveconstants could not be loaded')
+
 
 # File class from user fdb on StackOverflow
 # http://stackoverflow.com/questions/5896079/python-head-tail-and-backward-read-by-lines-of-a-text-file
