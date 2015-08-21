@@ -42,7 +42,7 @@ except:
 creds = sshutil.get_credentials()
 clintSwitch.credentials = creds
 clintSwitch.site = DEFAULT_SW_IP
-if __name__ == "__console__":
+if __name__ in ("__main__", "__console__"):
     pass
 else:
     print __name__
