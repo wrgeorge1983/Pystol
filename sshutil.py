@@ -15,7 +15,7 @@ from collections import namedtuple
 
 # Imports from other scripts in this project
 from metrics import UpdateMetric
-from sshexecute import sshrunP
+from depreciated.dep_sshexecute import sshrunP
 import sshexecute
 from metrics import DebugPrint
 import metrics

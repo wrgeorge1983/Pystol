@@ -11,7 +11,7 @@ from optparse import OptionParser
 
 
 # Imports from other scripts in this project
-from sshexecute import sshrun
+from depreciated.dep_sshexecute import sshrun
 import metrics
 from sshutil import listify, format_mac_address, get_credentials  # , resolve_mac
 import sshutil

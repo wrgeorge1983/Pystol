@@ -10,8 +10,7 @@ import getopt
 
 # Imports from other scripts in this project
 from sshutil import listify, get_credentials, DateTime
-from sshexecute import sshrun
-
+from depreciated.dep_sshexecute import sshrun
 
 DEBUG = False
 
