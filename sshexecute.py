@@ -265,7 +265,8 @@ def sshrun(command, host=None, creds=None, ssh=None, TextOnly=True):
 
 
 def sshrunP(command, host, creds, trim=True, timeout=1.5):
-    """Run a command using persistent session via SSH_SESSIONS.
+    """
+    Run a command using persistent session via SSH_SESSIONS.
 
     THE SESSION IS SUBJECT TO TIMEOUT, and WILL EXPIRE.  If session expires, it
     will be recreated the next time a command is ran.
@@ -342,6 +343,3 @@ def sshrunP(command, host, creds, trim=True, timeout=1.5):
     if DEBUG:
         print(rbuffer)
     return rslt
-
-if __name__ == '__main__':
-    pass
