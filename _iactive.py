@@ -524,4 +524,13 @@ def test_wb_switches():
     pool.close()
     pool.join()
 
+def test_wb_switches_simple(max_runs):
+    global wb
+    global switches
+    global pool
+    global rslts
+    wb = WorkbookWrapper('bia-netw.xlsx')
+    switches = [switch for switch in wb.switches_from_rows() if switch is not None]
 
+    rslts = map(populate_switch, switches[:max_runs])
+    return rslts
