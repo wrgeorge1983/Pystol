@@ -245,6 +245,9 @@ class EndDevice(object):
 
 
 class NetworkDevice(object):
+
+    prompt_test = lambda _, x: False
+
     def __init__(self, ip='None', creds=None):  # str ip
         self._ip = 'None'
         self.ip = ip
@@ -273,6 +276,7 @@ class NetworkDevice(object):
             self.connection = sshexecute.SSHConnection(self.ip,
                                                          self.credentials,
                                                          True)
+        self.connection.prompt_test = self.prompt_test
 
     def execute(self, command, trim=True, timeout=1.5):
         """

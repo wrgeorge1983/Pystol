@@ -55,6 +55,8 @@ class SSHConnection(object):
         self.stdOut = None
         self.stdErr = None
 
+        self.prompt_test = lambda x: False
+
     def run(self, command, timeout=None, trim=None, flush=None):
         """
         Run a command, interactive or not
@@ -75,6 +77,12 @@ class SSHConnection(object):
         """
         Run a command in interactive mode
         """
+        def default_prompt_test(line):
+            import re
+            pattern = r'\S+ [>#] ?$'
+            regex = re.compile(pattern)
+            return regex.match(line)
+
         UpdateMetric('_run_p()')
         chan = self.channel
         if not timeout:
@@ -87,28 +95,52 @@ class SSHConnection(object):
 
         chan.send(command)
 
-        n = 0
+        n, t = 0, 0
         # Max time to wait in any given stretch is timeout seconds
         # Sleep .05s at a time, timeout/.05 intervals
         interval = .05
+        rcv_timeout_modifier = 1
         DebugPrint('_run_p.host: {0}'.format(self.ip, True))
         DebugPrint('_run_p.command: {0}'.format(command, True))
+        UpdateMetric('_run_p.command: {0}'.format(command, True))
+
+
+        initial_rcv = True
+        subsequent_rcv = False
+        after_prompt_rcv = False
         while True:
-            if not chan.recv_ready():
-                if n == timeout/interval:
-                    UpdateMetric('Delay : {0}'.format(n))
-                    break
-                if n > 3 and len(rbuffer) > 0 and rbuffer[-1] == '#':
+            if chan.recv_ready():
+                UpdateMetric('Delay : {0:0>2} intervals'.format(n))
+                if initial_rcv:
+                    initial_rcv = False
+                    subsequent_rcv = True
+                    msg = 'Initial_Delay : {0:0>2} intervals'
+                elif subsequent_rcv:
+                    msg = 'Subsequent_Delay : {0:0>2} intervals'
+                UpdateMetric(msg.format(n))
+                if after_prompt_rcv:
+                    UpdateMetric('After_Prompt_Delay : {0:0>2} intervals'.format(n))
+                rbuffer = ''.join([rbuffer, chan.recv(1000)])
+                lines = rbuffer.splitlines()
+                n = 0
+                t += 1
+
+                if self.prompt_test(lines[-1]):
+                    # last line of output started with a prompt
+                    rcv_timeout_modifier = 8./30.
+                    after_prompt_rcv = True
+                else:
+                    # ensure timeout goes back up if we see data after a prompt
+                    rcv_timeout_modifier = 1
+
+            else:
+                if n >= (timeout * rcv_timeout_modifier)/interval:
+                    # UpdateMetric('Delay : {0} intervals'.format(n))
                     break
                 n += 1
-                time.sleep(interval)
-                if DEBUG:
-                    print ("waiting for data... ", n)
-            else:
-                rbuffer += chan.recv(1000)
-                if n > 0:
-                    UpdateMetric('Delay : {0}ms'.format((n * 1000)*interval))
-                n = 0
+                t += 1
+            time.sleep(interval)
+        UpdateMetric('Total Delay : {0:0>2} intervals'.format(t))
 
         if trim:
             rslt = '\n'.join(rbuffer.splitlines()[1:-1])
@@ -155,17 +187,17 @@ class SSHConnection(object):
         ip = self.ip
         username, password = self.credentials
         interactive = self.interactive
-        DebugPrint('NewSSH.ip: ' + str(ip), 0)
-        DebugPrint('NewSSH.username: ' + str(username), 0)
-        DebugPrint('NewSSH.interactive: ' + str(interactive), 0)
+        DebugPrint('NewSSH.ip: {0}'.format(str(ip)), 0)
+        DebugPrint('NewSSH.username: {0}'.format(str(username)), 0)
+        DebugPrint('NewSSH.interactive: {0}'.format(str(interactive)), 0)
 
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        try:
-            ssh.connect(self.ip, username=username, password=password,
-                        timeout=5)
-        except:
-            raise Exception('Couldn\'t Connect to {host}!'.format(host=ip))
+        # try:
+        ssh.connect(self.ip, username=username, password=password,
+                    timeout=5)
+        # except:
+        #     raise Exception('Couldn\'t Connect to {host}!'.format(host=ip))
 
         self.session = ssh
         if interactive:
@@ -184,5 +216,5 @@ class SSHConnection(object):
     def buffer_flush(self):
         rslt = ''
         while self.channel.recv_ready():
-            rslt += self.channel.recv(1000)
+            rslt = ''.join([rslt, self.channel.recv(1000)])
         return rslt
