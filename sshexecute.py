@@ -4,6 +4,7 @@ Created on Dec 1, 2014
 @author: William.George
 '''
 # Standard Library Imports
+import sys
 import time
 
 # External Library Imports
@@ -102,9 +103,13 @@ class SSHConnection(object):
                 n += 1
                 time.sleep(interval)
                 if DEBUG:
-                    print ("waiting for data... ", n)
+                    print("waiting for data... ", n)
             else:
-                rbuffer += chan.recv(1000)
+                bbuff = chan.recv(1000)
+                try:
+                    rbuffer += bbuff
+                except TypeError:
+                    rbuffer += bbuff.decode(sys.stdin.encoding)
                 if n > 0:
                     UpdateMetric('Delay : {0}ms'.format((n * 1000)*interval))
                 n = 0
@@ -176,7 +181,11 @@ class SSHConnection(object):
     def buffer_flush(self):
         rslt = ''
         while self.channel.recv_ready():
-            rslt += self.channel.recv(1000)
+            bbuff = self.channel.recv(1000)
+            try:
+                rslt += bbuff
+            except TypeError:
+                rslt += bbuff.decode(sys.stdin.encoding)
         return rslt
 
 def NewSSH(host, creds, interactive=False):
@@ -288,10 +297,10 @@ def sshrunP(command, host, creds, trim=True, timeout=1.5):
             SSH_HOSTS.append(host)
             DisablePagingH(host, creds)
         if DEBUG:
-            print index
-            print SSH_SESSIONS
-            print SSH_CHANNELS
-            print SSH_HOSTS
+            print(index)
+            print(SSH_SESSIONS)
+            print(SSH_CHANNELS)
+            print(SSH_HOSTS)
 
     if not SSH_CHANNELS[index].transport.is_active():
         SSH_SESSIONS[index], SSH_CHANNELS[index] = NewSSH(host, creds,
@@ -314,7 +323,7 @@ def sshrunP(command, host, creds, trim=True, timeout=1.5):
             n += 1
             time.sleep(interval)
             if DEBUG:
-                print ("waiting for data... ", n)
+                print("waiting for data... ", n)
         else:
             rbuffer += SSH_CHANNELS[index].recv(1000)
             if n > 0:
