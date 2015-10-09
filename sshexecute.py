@@ -4,6 +4,7 @@ Created on Dec 1, 2014
 @author: William.George
 """
 # Standard Library Imports
+import sys
 import time
 
 # External Library Imports
@@ -120,7 +121,11 @@ class SSHConnection(object):
                 UpdateMetric(msg.format(n))
                 if after_prompt_rcv:
                     UpdateMetric('After_Prompt_Delay : {0:0>2} intervals'.format(n))
-                rbuffer = ''.join([rbuffer, chan.recv(1000)])
+                cbuffer = chan.recv(1000)
+                try:
+                    rbuffer = ''.join([rbuffer, cbuffer])
+                except TypeError:
+                    rbuffer = ''.join([rbuffer, cbuffer.decode(sys.stdin.encoding)])
                 lines = rbuffer.splitlines()
                 n = 0
                 t += 1

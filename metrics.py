@@ -17,19 +17,19 @@ def UpdateMetric(metric='default'):
         METRICS[metric] = 0
     METRICS[metric] += 1
     if DEBUG:
-        print metric, METRICS[metric]
+        print(metric, METRICS[metric])
 
 
 def PrintMetrics():
     ''' Print metrics previously stored with 'UpdateMetric' '''
     for k in sorted(METRICS):
-        print k, METRICS[k]
+        print(k, METRICS[k])
 
 
 def DebugPrint(msg, level=1):
     levelNames = {0: 'DEBUG', 1: 'INFO', 2: 'STATUS', 3: 'ERROR'}
     if level >= (3 - VERBOSITY):
-        print '{0}:{1}'.format(levelNames[level], msg)
+        print('{0}:{1}'.format(levelNames[level], msg))
 
 
 def Clock(start=False):

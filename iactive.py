@@ -32,11 +32,16 @@ try:
 except ImportError:
     pass
 
-# run users pythonrc
+# run users pythonrc\
+filename = pythonrc()
 try:
-    execfile(pythonrc())
+    execfile(filename)
+except NameError:
+    with open(filename) as f:
+        code = compile(f.read(), filename, 'exec')
+        exec(code)
 except:
-    print 'Couldn\'t include ~/.pythonrc.py'
+    print('Couldn\'t include ~/.pythonrc.py')
     raise
 
 creds = sshutil.get_credentials()
@@ -45,6 +50,6 @@ clintSwitch.site = DEFAULT_SW_IP
 if __name__ in ("__main__", "__console__"):
     pass
 else:
-    print __name__
-    print "There is no good reason you should be usinging this in anything BUT an interactive mode, so stop it!"
+    print(__name__)
+    print("There is no good reason you should be using this in anything BUT an interactive mode, so stop it!")
     exit()

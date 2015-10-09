@@ -40,8 +40,8 @@ def deduplicate_list(oList, tag=None):
         if item in nList:
             index = nList.index(item)
             if DEBUG:
-                print ('******\n{2}\nDuplicate Entry!!\nOld:{0}\nNew:{1}\n'
-                       '******'.format(repr(nList[index]), repr(item), tag))
+                print('******\n{2}\nDuplicate Entry!!\nOld:{0}\nNew:{1}\n'
+                      '******'.format(repr(nList[index]), repr(item), tag))
             nList[index] = item
         else:
             nList.append(item)

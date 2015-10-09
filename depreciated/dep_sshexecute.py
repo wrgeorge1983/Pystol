@@ -82,10 +82,10 @@ def sshrunP(command, host, creds, trim=True, timeout=1.5):
             SSH_HOSTS.append(host)
             DisablePagingH(host, creds)
         if DEBUG:
-            print index
-            print SSH_SESSIONS
-            print SSH_CHANNELS
-            print SSH_HOSTS
+            print(index)
+            print(SSH_SESSIONS)
+            print(SSH_CHANNELS)
+            print(SSH_HOSTS)
 
     if not SSH_CHANNELS[index].transport.is_active():
         SSH_SESSIONS[index], SSH_CHANNELS[index] = NewSSH(host, creds,
