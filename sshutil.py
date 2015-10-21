@@ -6,12 +6,15 @@ Library of functions and classes to use in other scripts.
 @author: William.George
 """
 # Standard Library Imports
+
+from collections import namedtuple
 import getpass
+from itertools import product, chain
+import json
 import time
 import multiprocessing
 import socket
 import re
-from collections import namedtuple
 
 # Imports from other scripts in this project
 from metrics import UpdateMetric
@@ -19,7 +22,6 @@ from depreciated.dep_sshexecute import sshrunP
 import sshexecute
 from metrics import DebugPrint
 import metrics
-from collections import namedtuple
 
 
 # TODO:  FIX THIS MESS
@@ -28,6 +30,8 @@ ARP_TABLE = []
 DEFAULT_GATEWAY = None
 CREDENTIALS = None  # SET THESE IN MAIN()!
 CURRENT_SWITCH = None
+
+FlashSpace = namedtuple('FlashSpace', 'free, total')
 
 
 def deduplicate_list(oList, tag=None):
@@ -257,6 +261,7 @@ class NetworkDevice(object):
         self.goodstates = ['UNK', 'UP']
         self.state = 'UNK'  # valid states: ['UNK', 'UP', 'DOWN']
         self.connection = None
+        self.data = {}
 
     @property
     def ip(self):
@@ -280,6 +285,8 @@ class NetworkDevice(object):
 
     def execute(self, command, trim=True, timeout=1.5):
         """
+                    INTERFACED: FALSE
+
         Connect to switch and execute 'command'
         """
         self._connect()
@@ -294,6 +301,35 @@ class NetworkDevice(object):
         else:
             self.state = 'UP'
             return lines
+
+    def ifce_execute(self, command, trim=True, timeout=1.5, data=None, force=False):
+        """
+        INTERFACED: TRUE
+
+        Connect to remote device and execute 'command'
+        """
+        if data is None:
+            data = {}
+
+        data_cm = dict(chain(self.data.items(), data.items()))
+
+        try:
+            if force:
+                raise KeyError
+            e_rslt = self.data[command] = data_cm[command]
+        except KeyError:
+            e_rslt = self.data[command] = self.execute(command)
+        return e_rslt
+
+    def jloads(self, jsons):
+        data = json.loads(jsons)
+        self.data.update(data)
+        return data
+
+    def jdumps(self):
+        data = self.data
+        return json.dumps(data)
+
 
 
 class Riverbed(NetworkDevice):
@@ -316,6 +352,7 @@ class Switch(NetworkDevice):
     @property
     def hostname(self):
         """
+        INTERFACED: Safe
         Cisco Specific
         :return:
         """
@@ -328,63 +365,91 @@ class Switch(NetworkDevice):
         return ''
 
     @property
-    def supervisor(self):
+    def supervisor(self, data=False):
         """
+        INTERFACED: TRUE
         Cisco Specific
         :return:
         """
-        if not self.supported:
-            return 'UNK'
+        # cache check
 
-        _supervisor = getattr(self, '_supervisor', None)
-        if _supervisor is not None:
+        try:
+            _supervisor = self._supervisor
+        except AttributeError:
+            _supervisor = self._supervisor = self._collect_supervisor()
+
+        return _supervisor
+
+    def _collect_supervisor(self, data=None, force=False):
+        """
+        INTERFACED: TRUE
+        :param data:
+        :return:
+        """
+
+        _supervisor = 'UNK'
+
+        # support check
+        if not self.supported:
             return _supervisor
 
-        _supervisor = ''
-        for line in self.execute('show module').splitlines():
+        # data check
+        command = 'show module'
+        e_rslt = self.ifce_execute(command)
+
+        # process data
+        for line in e_rslt.splitlines():
             if 'supervisor' in line.lower():
                 _supervisor = line.split()[-2]
-        self._supervisor = _supervisor
-        return self._supervisor
+
+        return _supervisor
 
     @property
     def flash(self):
         """
+        INTERFACED: True
         Cisco Specific
         :return:
         """
+        try:
+            _flash = self._flash
+        except AttributeError:
+            _flash = self._flash = self._collect_flash()
+
+        return _flash
+
+    def _collect_flash(self, data=None, force=False):
+        """
+        INTERFACED: TRUE
+        :param data:
+        :return:
+        """
+        _flash = 'UNK'
+
+        # support check
         if not self.supported:
-            return 'UNK'
-        _flash = getattr(self, '_flash', None)
-        if _flash is not None:
             return _flash
 
-        FlashSpace = namedtuple('FlashSpace', 'free, total')
-        # filesystems = ['bootdisk:', 'flash:', 'bootflash:',
-        #                'sup-bootflash:', 'slot0:']
+        command = 'dir'
+        e_rslt = self.ifce_execute(command)
 
-        rslt = self.execute('dir')
-        if any([word in rslt.lower() for word in ('invalid', 'error')]):
-            return 'UNK'
 
-        rslt = rslt.splitlines()[-1]
-        fs = FlashSpace(*reversed([int(sub.split()[0]) for sub in rslt.split('(')]))
+        if any([word in e_rslt.lower() for word in ('invalid', 'error')]):
+            return _flash
+
+        e_rslt = e_rslt.splitlines()[-1]
+
         # FlashSpace(free=xxxx, total=yyyy)
-        self._flash = fs
-        return self._flash
 
-        # for filesystem in reversed(filesystems):
-        #     rslt = self.execute('dir {0}'.format(filesystem))
-        #     if 'Invalid input' not in rslt and 'Error' not in rslt:
-        #         line = rslt.splitlines()[-1]
-        #         #fs = FreeSpace(line.split()[-3].strip('('),
-        #         #               line.split()[0])
-        #         #return fs
-        #         return filesystem, line, self.execute('dir').splitlines()[-1]
+        fs = FlashSpace(*reversed([int(sub.split()[0]) for sub in e_rslt.split('(')]))
+
+        _flash = self._flash = fs
+        return _flash
 
     @property
     def available_ram(self):
         """
+        INTERFACED: SAFE
         Cisco Specific
         :return:
         """
@@ -411,6 +476,7 @@ class Switch(NetworkDevice):
     @property
     def model(self):
         """
+        INTERFACED: SAFE
         Deduces this switches model number from 'sh ver' output.
         This will fail gracefully to 'UNK', but 'Switch.supported' will return False in
             this case and many features will refuse to run.
@@ -424,6 +490,9 @@ class Switch(NetworkDevice):
 
     @property
     def supported(self):
+        """
+        INTERFACED: SAFE
+        """
         if self.model == 'UNK':
             return False
 
@@ -432,6 +501,7 @@ class Switch(NetworkDevice):
     @property
     def stacked(self):
         """
+        INTERFACED: SAFE
         whether or not the switch represents or is a member of a stack
         :return: bool
         """
@@ -458,6 +528,9 @@ class Switch(NetworkDevice):
 
     @property
     def license(self):
+        """
+        INTERFACED: SAFE
+        """
         if not self.supported:
             return 'UNK'
 
@@ -468,6 +541,11 @@ class Switch(NetworkDevice):
             return self._license
 
     def _collect_license(self):
+        """
+
+        INTERFACED: SAFE
+        :return:
+        """
 
         regex = re.compile(r'\(..*\),')
 
@@ -491,22 +569,23 @@ class Switch(NetworkDevice):
 
     def _read_universal_license(self):
         """
+        INTERFACED: TRUE
         Will return string in form: "(featureset, featureset)" if multiple valid
         featuresets found.  Otherwise "featureset".
         :return:
         """
-        sh_license = self.execute('sh license')
+        sh_license = self.ifce_execute('sh license')
         index = 0
         licenses = {}
         rslts = []
 
         if '% Incomplete' in sh_license:
-            license_options = self.execute('sh license ?')
+            license_options = self.ifce_execute('sh license ?')
 
             if 'summary' in license_options:
-                sh_license = self.execute('sh license summary')
+                sh_license = self.ifce_execute('sh license summary')
             elif 'right-to-use' in license_options:
-                rtu = self.execute('sh license right-to-use')
+                rtu = self.ifce_execute('sh license right-to-use')
                 for line in rtu.splitlines():
                     if 'permanent' in line:
                         return line.split()[1]
@@ -540,6 +619,8 @@ class Switch(NetworkDevice):
 
     @property
     def software_version(self):
+        """
+            INTERFACED: True """
         if not self.supported:
             return 'UNK'
 
@@ -560,6 +641,7 @@ class Switch(NetworkDevice):
     @property
     def version(self):
         """
+        INTERFACED: TRUE
         Cisco Specific
         :return:
         """
@@ -572,6 +654,7 @@ class Switch(NetworkDevice):
     @property
     def startup_config(self):
         """
+        INTERFACED: TRUE
         Cisco Specific
         :return:
         """
@@ -583,19 +666,21 @@ class Switch(NetworkDevice):
 
     def _collect_startup_config(self):
         """
+        INTERFACED: TRUE
         Cisco Specific
         :return:
         """
-        self._startup_config = self.execute('show startup-config')
+        self._startup_config = self.ifce_execute('show startup-config')
 
     def _collect_version(self, data=False):
         """
+            INTERFACED: TRUE
            Pull Version info
         """
         command = 'sh ver'
         UpdateMetric('Switch._collect_version')
         try:
-            rBuffer = self.execute(command)
+            rBuffer = self.ifce_execute(command)
         except:
             raise
 
@@ -603,10 +688,18 @@ class Switch(NetworkDevice):
 
     @property
     def ports(self):
+        """
+
+            INTERFACED: TRUE
+        :return:
+        """
         return self._ports
 
     @ports.setter
     def ports(self, arg):
+        """
+        INTERFACED: TRUE
+        """
         if type(arg) == list:
             self._ports = arg
             i = 0
@@ -623,10 +716,16 @@ class Switch(NetworkDevice):
 
     @property
     def devices(self):
+        """
+        INTERFACED: TRUE
+        """
         return self._devices
 
     @devices.setter
     def devices(self, arg):
+        """
+        INTERFACED: TRUE
+        """
         if type(arg) == list:
             self._devices = arg
         else:
@@ -635,6 +734,7 @@ class Switch(NetworkDevice):
 
     def populate(self):
         """
+        INTERFACED: TRUE
         Run all of this switches 'collect' methods.  Typically faster
         than running them one by one at different times because you never
         have to rebuild the connection, etc...
@@ -671,6 +771,9 @@ class Switch(NetworkDevice):
         return self.state
 
     def populate_lite(self):
+        """
+        INTERFACED: TRUE
+        """
 
         if self.ip == 'None' or not self.credentials:
             metrics.DebugPrint('Attempt to populate switch data missing IP'
@@ -687,11 +790,12 @@ class Switch(NetworkDevice):
 
     def collect_mac_table(self):
         """
+        INTERFACED: TRUE
         Connect to switch and pull MAC Address table
         """
         command = 'sh mac address-table'
         UpdateMetric('Switch.collect_mac_table')
-        lines = self.execute(command)
+        lines = self.ifce_execute(command)
         self._mac_address_table = '\n'.join(
             [x for x in lines.splitlines() if 'dynamic' in x.lower()])
 
@@ -704,13 +808,14 @@ class Switch(NetworkDevice):
 
     def _get_interfaces(self, data=False):
         """
+        INTERFACED: TRUE
         Return all interfaces on a switch, including stats
         """
         command = 'show interface'
         UpdateMetric('Switch._get_interfaces')
         if not data:
             try:
-                lines = self.execute(command).splitlines()
+                lines = self.ifce_execute(command).splitlines()
             except:
                 self.state = 'DOWN'
                 return []
@@ -739,6 +844,7 @@ class Switch(NetworkDevice):
 
     def _collect_cdp_information(self, data=False):
         """
+        INTERFACED: TRUE
            Apply CDP neighbor information to self.ports[]
            ex. switch.ports[1].CDPneigh[0] == (
                NeighborID,
@@ -749,7 +855,7 @@ class Switch(NetworkDevice):
         command = 'sh cdp ne det'
         UpdateMetric('Switch._collect_cdp_information')
         try:
-            rBuffer = self.execute(command)
+            rBuffer = self.ifce_execute(command)
         except:
             raise
 
@@ -785,8 +891,9 @@ class Switch(NetworkDevice):
 
     def _classify_ports(self, data=False):
         """
-            Classify ports by switchport mode.
-            ('access', 'trunk')
+        INTERFACED: TRUE
+        Classify ports by switchport mode.
+        ('access', 'trunk')
         """
         name = ''
         switchport = ''
@@ -799,7 +906,7 @@ class Switch(NetworkDevice):
             if self.state not in self.goodstates:
                 return
             try:
-                rBuffer = self.execute(command)
+                rBuffer = self.ifce_execute(command)
             except:
                 raise
 
@@ -828,9 +935,10 @@ class Switch(NetworkDevice):
 
     def _collect_interface_descriptions(self, data=False):
         """
-            Apply existing interface descriptions to
-            switch.ports[] ex. switch.ports[1].description = 'Trunk to
-            ABQCore1'
+        INTERFACED: TRUE
+        Apply existing interface descriptions to
+        switch.ports[] ex. switch.ports[1].description = 'Trunk to
+        ABQCore1'
         """
         command = 'sh int description'
         UpdateMetric('_collect_interface_descriptions')
@@ -838,7 +946,7 @@ class Switch(NetworkDevice):
             return
 
         try:
-            rBuffer = self.execute(command)
+            rBuffer = self.ifce_execute(command)
         except:
             raise
         spLines = rBuffer.splitlines()[1:]
@@ -862,6 +970,9 @@ class Switch(NetworkDevice):
             switchport.description = description
 
     def _get_end_devices(self):
+        """
+        INTERFACED: TRUE
+        """
         rslt = []
         scrubbedInterfaceList = []
         scrubbedMACAddressTable = []
@@ -870,7 +981,7 @@ class Switch(NetworkDevice):
             metrics.DebugPrint('[{0}].[{1}].edge:  {2}'.format(self.ip,
                                                                port.name,
                                                                port.edge))
-            if port.edge:
+            if port.edge:  # INTERFACED: FALSE
                 scrubbedInterfaceList.append(port)
         DebugPrint('[{0}]._get_end_devices.len(scrubbedInterfaceList): {1}'
                    ''.format(self.ip, len(scrubbedInterfaceList)), 1)
@@ -883,11 +994,11 @@ class Switch(NetworkDevice):
         DebugPrint('[{0}]._get_end_devices.macAddressTable: {1}'
                    ''.format(self.ip, macAddressTable), 0)
 
-        for interface in scrubbedInterfaceList:
-            for line in macAddressTable.splitlines():
-                if line.strip().endswith(format_interface_name(str(interface),
-                                                             short=True)):
-                    scrubbedMACAddressTable.append(line.strip())
+        for interface, line in product(scrubbedInterfaceList,
+                                       macAddressTable.splitlines()):
+            if line.strip().endswith(format_interface_name(str(interface),
+                                                         short=True)):
+                scrubbedMACAddressTable.append(line.strip())
 
         for line in scrubbedMACAddressTable:
             mac = format_mac_address(line.split()[1])
