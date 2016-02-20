@@ -35,14 +35,15 @@ except ImportError:
 # run users pythonrc\
 filename = pythonrc()
 try:
-    execfile(filename)
-except NameError:
-    with open(filename) as f:
-        code = compile(f.read(), filename, 'exec')
-        exec(code)
+    try:
+        execfile(filename)
+    except NameError:
+        with open(filename) as f:
+            code = compile(f.read(), filename, 'exec')
+            exec(code)
 except:
     print('Couldn\'t include ~/.pythonrc.py')
-    raise
+
 
 creds = sshutil.get_credentials()
 clintSwitch.credentials = creds
